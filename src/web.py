@@ -59,6 +59,16 @@ class MyServer(BaseHTTPRequestHandler):
         if o.path == "/":
             dictRs = {}
             # print("path is / lets do cool stuff")
+
+            # todo
+            # 
+            #   add caching (not sure what exactly) in the event we get an empty value or error
+            #       from source, we can use last known good value.
+            # 
+            #   Additional functionality, possible long-term caching DNS results
+            #       and having a scheduler periodically validating the cache, keeping it fresh
+            #       goal is to improve throughput of DNS lookups
+
             rs = doLookups(o.query)
             dictRs['value'] = rs
             y = json.dumps(dictRs)
