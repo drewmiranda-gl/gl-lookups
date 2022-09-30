@@ -3,9 +3,19 @@ from unittest import result
 from urllib.parse import urlparse
 import time
 import json
+import argparse
+
+# defaults
+parser = argparse.ArgumentParser(description="Just an example",
+                                 formatter_class=argparse.ArgumentDefaultsHelpFormatter)
+parser.add_argument("--debug", "-d", help="For debugging", action=argparse.BooleanOptionalAction)
+parser.add_argument("--port", help="Port to bind to (TCP)", default="8080")
+
+args = parser.parse_args()
+configFromArg = vars(args)
 
 hostName = "localhost"
-serverPort = 8080
+serverPort = int(configFromArg['port'])
 
 def get_ipv4_by_hostname(hostname):
     import socket
