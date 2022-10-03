@@ -1,0 +1,18 @@
+[Unit]
+Description=Graylog Server Lookup Helper Service
+Requires=network.target remote-fs.target
+After=network.target remote-fs.target
+ConditionPathExists=/opt/graylog/lookup-service
+
+[Service]
+User=gl_lookup_service
+Group=gl_lookup_service
+WorkingDirectory=/opt/graylog/lookup-service
+Type=simple
+Restart=always
+ExecStart=/usr/bin/python3 /opt/graylog/lookup-service/web.py
+StandardOutput=append:/opt/graylog/lookup-service/web.log
+StandardError=append:/opt/graylog/lookup-service/web.log
+
+[Install]
+WantedBy=multi-user.target
