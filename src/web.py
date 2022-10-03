@@ -1,14 +1,15 @@
 from http.server import BaseHTTPRequestHandler, HTTPServer
 from unittest import result
 from urllib.parse import urlparse
-import time
+# import time
 import json
 import argparse
+# import sys
+import logging
 
 # defaults
 parser = argparse.ArgumentParser(description="Just an example",
                                  formatter_class=argparse.ArgumentDefaultsHelpFormatter)
-parser.add_argument("--debug", "-d", help="For debugging", action=argparse.BooleanOptionalAction)
 parser.add_argument("--port", help="Port to bind to (TCP)", default="8080")
 
 args = parser.parse_args()
@@ -59,7 +60,13 @@ def doLookups(argQuery):
         return lookupDns(oArgs['key'])
 
 class MyServer(BaseHTTPRequestHandler):
+    def myLog( self, fmt, request, code, other ):
+        logging.basicConfig(filename='web.log', encoding='utf-8', level=logging.DEBUG)
+        # syslog( LOG_INFO, '%s %s' % ( code, request) )
+        logging.info('%s %s' % ( code, request))
+        
     def do_GET(self):
+        self.log_message = self.myLog
         self.send_response(200)
         self.send_header("Content-type", "application/json")
         self.end_headers()
