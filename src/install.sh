@@ -14,8 +14,13 @@ sudo chown -R gl_lookup_service:gl_lookup_service /opt/graylog/lookup-service/
 
 
 # install service.....
-# /etc/systemd/system/gl_lookup.service
+cp gl_lookup.service /etc/systemd/system/gl_lookup.service
+cp gl_lookup2.service /etc/systemd/system/gl_lookup2.service
 
 sudo systemctl daemon-reload
+
 sudo systemctl enable gl_lookup.service
 sudo systemctl start gl_lookup.service
+
+sudo systemctl enable gl_lookup2.service
+sudo systemctl start gl_lookup2.service
