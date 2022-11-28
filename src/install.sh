@@ -9,7 +9,8 @@ sudo mkdir -p /opt/graylog/lookup-service
 cp web.py /opt/graylog/lookup-service
 
 # set owner
-sudo -u gl_lookup_service touch /opt/graylog/lookup-service/web.log
+sudo -u gl_lookup_service touch /opt/graylog/lookup-service/web1.log
+sudo -u gl_lookup_service touch /opt/graylog/lookup-service/web2.log
 sudo chown -R gl_lookup_service:gl_lookup_service /opt/graylog/lookup-service/
 
 
