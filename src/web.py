@@ -64,12 +64,19 @@ class MyServer(BaseHTTPRequestHandler):
         logging.basicConfig(filename='web.log', encoding='utf-8', level=logging.DEBUG)
         # syslog( LOG_INFO, '%s %s' % ( code, request) )
         logging.info('%s %s' % ( code, request))
-        
+    
+    def myLogException(e, what):
+        logging.basicConfig(filename='err.log', encoding='utf-8', level=logging.DEBUG)
+        logging.error('Error at %s', 'division', exc_info=e)
+
+
     def do_GET(self):
         self.log_message = self.myLog
-        self.send_response(200)
-        self.send_header("Content-type", "application/json")
-        self.end_headers()
+
+        # self.send_response(200)
+        # self.send_header("Content-type", "application/json")
+        # self.end_headers()
+        
         # self.wfile.write(bytes("%s" % self.path, "utf-8"))
         # print(self.path)
         o = urlparse(self.path)
@@ -86,13 +93,24 @@ class MyServer(BaseHTTPRequestHandler):
             #       and having a scheduler periodically validating the cache, keeping it fresh
             #       goal is to improve throughput of DNS lookups
 
-            rs = doLookups(o.query)
-            dictRs['value'] = rs
-            y = json.dumps(dictRs)
+            self.send_response(200)
+            self.send_header("Content-type", "application/json")
+            self.end_headers()
 
-            self.wfile.write(bytes(y, "utf-8"))
+            try:
+                rs = doLookups(o.query)
+                dictRs['value'] = rs
+                y = json.dumps(dictRs)
+                self.wfile.write(bytes(y, "utf-8"))
+            except Exception as e:
+                excpInfo = "" + str(e) + "; Query: " + str(o.query)
+                dicRet = {}
+                dicRet["err"] = excpInfo
+                # self.wfile.write(bytes(json.dumps(dicRet), "utf-8"))
+                # print(excpInfo)
+                logging.error(excpInfo)
 
-if __name__ == "__main__":        
+if __name__ == "__main__":
     webServer = HTTPServer((hostName, serverPort), MyServer)
     print("Server started http://%s:%s" % (hostName, serverPort))
 
