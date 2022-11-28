@@ -1,25 +1,21 @@
 # https://www.elastic.co/guide/en/beats/filebeat/7.17/filebeat-input-journald.html
 
 filebeat.inputs:
-
+  
 - type: journald
   id: gl_lookup.service
   include_matches:
     - _SYSTEMD_UNIT=gl_lookup.service
-  multiline.type: pattern
-  multiline.pattern: '^\-\-\-\-'
-  multiline.negate: true
-  multiline.match: after
+  seek: tail
+
 - type: journald
   id: gl_lookup2.service
   include_matches:
     - _SYSTEMD_UNIT=gl_lookup2.service
-  multiline.type: pattern
-  multiline.pattern: '^\-\-\-\-'
-  multiline.negate: true
-  multiline.match: after
+  seek: tail
 
 output.file:
   path: "/graylog/filebeat_for_journald"
   filename: journald
-
+  codec.format:
+    string: '%{[@timestamp]} %{[message]}'
