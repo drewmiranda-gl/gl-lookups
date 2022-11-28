@@ -32,6 +32,9 @@ def get_domain_name(ip_address):
   return list(result)[0]
 
 def lookupRDns(argQuery):
+    # log to filter out/ignore
+    #   255.255.255.255
+
     result = get_domain_name(argQuery)
     return result
 
