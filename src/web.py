@@ -11,12 +11,15 @@ import logging
 parser = argparse.ArgumentParser(description="Just an example",
                                  formatter_class=argparse.ArgumentDefaultsHelpFormatter)
 parser.add_argument("--port", help="Port to bind to (TCP)", default="8080")
+parser.add_argument("--log", help="Output Log File", default="web.log")
+
 
 args = parser.parse_args()
 configFromArg = vars(args)
 
 hostName = "localhost"
 serverPort = int(configFromArg['port'])
+logFile = str(configFromArg['log'])
 
 def get_ipv4_by_hostname(hostname):
     import socket
@@ -61,14 +64,9 @@ def doLookups(argQuery):
 
 class MyServer(BaseHTTPRequestHandler):
     def myLog( self, fmt, request, code, other ):
-        logging.basicConfig(filename='web.log', encoding='utf-8', level=logging.DEBUG)
+        logging.basicConfig(filename=logFile, encoding='utf-8', level=logging.DEBUG)
         # syslog( LOG_INFO, '%s %s' % ( code, request) )
         logging.info('%s %s' % ( code, request))
-    
-    def myLogException(e, what):
-        logging.basicConfig(filename='err.log', encoding='utf-8', level=logging.DEBUG)
-        logging.error('Error at %s', 'division', exc_info=e)
-
 
     def do_GET(self):
         self.log_message = self.myLog
