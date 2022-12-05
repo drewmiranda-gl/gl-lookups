@@ -6,6 +6,7 @@ import json
 import argparse
 # import sys
 import logging
+import ipaddress
 
 # defaults
 parser = argparse.ArgumentParser(description="Just an example",
@@ -34,9 +35,34 @@ def get_domain_name(ip_address):
 def lookupRDns(argQuery):
     # log to filter out/ignore
     #   255.255.255.255
+    #   private IP
+    #       127.0.0.0/8 (127.0.0.0 - 127.255.255.255)
+    #       10.0.0.0/8 (10.0.0.0 - 10.255.255.255)
+    #       127.16.0.0/12 (172.16.0.0 - 172.31.255.255)
+    #       192.168.0.0/16 (192.168.0.0 - 192.168.255.255)
+    #   multicast/broadcast
 
-    result = get_domain_name(argQuery)
-    return result
+    lIgnoreThese = ["239.255.255.250", "255.255.255.255"]
+
+    bGiveResult = True
+
+    if str(argQuery) in lIgnoreThese:
+        bGiveResult = False
+    elif ipaddress.ip_address(str(argQuery)) in ipaddress.ip_network('192.168.0.0/16'):
+        if not ipaddress.ip_address(str(argQuery)) in ipaddress.ip_network('192.168.0.0/24'):
+            bGiveResult = False
+    elif ipaddress.ip_address(str(argQuery)) in ipaddress.ip_network('10.0.0.0/8'):
+        bGiveResult = False
+    elif ipaddress.ip_address(str(argQuery)) in ipaddress.ip_network('127.16.0.0/12'):
+        bGiveResult = False
+    elif ipaddress.ip_address(str(argQuery)) in ipaddress.ip_network('127.0.0.0/8'):
+        bGiveResult = False
+
+    if bGiveResult == False:
+        return ""
+    else:
+        result = get_domain_name(argQuery)
+        return result
 
 def lookupDns(argQuery):
     result = get_ipv4_by_hostname(argQuery)
