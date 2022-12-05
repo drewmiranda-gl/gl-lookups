@@ -3,3 +3,5 @@ src/web.log
 src/haproxy/fields.txt
 src/haproxy/fields_names.txt
 src/haproxy/regex.txt
+src/*.db
+src/*.ini
