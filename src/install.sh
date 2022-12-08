@@ -5,8 +5,7 @@ sudo adduser --system --disabled-password --disabled-login --home /var/empty --n
 # service dir
 sudo mkdir -p /opt/graylog/lookup-service
 
-# copy file
-cp web.py /opt/graylog/lookup-service
+sudo cp web.py /opt/graylog/lookup-service
 
 # set owner
 sudo -u gl_lookup_service touch /opt/graylog/lookup-service/web1.log
