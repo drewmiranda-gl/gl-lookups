@@ -56,7 +56,8 @@ def lookupRDns(argQuery):
     elif ipaddress.ip_address(str(argQuery)) in ipaddress.ip_network('127.16.0.0/12'):
         bGiveResult = False
     elif ipaddress.ip_address(str(argQuery)) in ipaddress.ip_network('127.0.0.0/8'):
-        bGiveResult = False
+        bGiveResult = True
+        result = "localhost"
 
     if bGiveResult == False:
         return ""
