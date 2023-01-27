@@ -70,6 +70,26 @@ def lookupDns(argQuery):
     return result
     # return result
 
+def anomUrl(argQuery):
+    oArgs = parseArgs(argQuery)
+    # build URL
+    # http://graylog.drew.local:9000/search?q=source%3Apfsense+AND+_exists_%3Aquery_request_length&rangetype=absolute&from=2022-12-12T11%3A41%3A51.366Z&to=2022-12-12T11%3A56%3A51.366Z
+    # http://graylog.drew.local:9000/search?q=source:pfsense AND _exists_:query_request_length&rangetype=absolute&from=2022-12-12%2005:41:51.366Z&to=2022-12-12%2005:56:51.366Z
+    # search?q=source:pfsense+AND+_exists_:query_request_length&rangetype=absolute&from=2022-12-12T11:41:51.366Z&to=2022-12-12T11:56:51.366Z
+    strConcat = ""
+    strConcat = strConcat + "http://graylog.drew.local:9000/"
+    strConcat = strConcat + "search?q=" + "source:pfsense AND _exists_:query_request_length"
+    strConcat = strConcat + "&rangetype=absolute"
+
+    startTime = urllib.parse.unquote(oArgs['anomaly_data_start_time'])
+    startTime = startTime.replace(" ", "T")
+    strConcat = strConcat + "&from=" + startTime + "Z"
+    
+    endTime = urllib.parse.unquote(oArgs['anomaly_data_end_time'])
+    endTime = endTime.replace(" ", "T")
+    strConcat = strConcat + "&to=" + endTime + "Z"
+    return strConcat
+
 def parseArgs(argQuery):
     dictArgs = {}
     sKey = ""
@@ -91,6 +111,8 @@ def doLookups(argQuery):
         return lookupRDns(oArgs['key'])
     elif sLookup == "dns":
         return lookupDns(oArgs['key'])
+    elif sLookup == "anom_url":
+        return anomUrl(argQuery)
 
 class MyServer(BaseHTTPRequestHandler):
     def myLog( self, fmt, request, code, other ):
