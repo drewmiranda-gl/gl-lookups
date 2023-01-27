@@ -90,6 +90,57 @@ def anomUrl(argQuery):
     strConcat = strConcat + "&to=" + endTime + "Z"
     return strConcat
 
+def translateMask(argHexMask):
+    # return argHexMask
+    iDec = int(argHexMask, 16)
+
+    sOutputMask = []
+
+    dMaskSchema = {}
+    
+    dMaskSchema["16777216"] = "ACCESS_SYS_SEC"
+    dMaskSchema["1048576"] = "SYNCHRONIZE"
+    dMaskSchema["524288"] = "WRITE_OWNER"
+    dMaskSchema["262144"] = "WRITE_DAC"
+    dMaskSchema["131072"] = "READ_CONTROL"
+    dMaskSchema["65536"] = "DeleteChild"
+    dMaskSchema["256"] = "WriteAttributes"
+    dMaskSchema["128"] = "ReadAttributes"
+    dMaskSchema["64"] = "DeleteChild"
+    dMaskSchema["32"] = "Execute/Traverse"
+    dMaskSchema["16"] = "WriteExtendedAttr"
+    dMaskSchema["8"] = "ReadExtendedAttr"
+    dMaskSchema["4"] = "AppendData/AddSubdirectory"
+    dMaskSchema["2"] = "WriteData/AddFile"
+    dMaskSchema["1"] = "ReadData/ListDirectory"
+
+    iRemainder = iDec
+
+    for schemaItemKey in dMaskSchema:
+        attempt = int(iRemainder) - int(schemaItemKey)
+        # print("")
+        # print("Attempt: " + str(attempt))
+        if attempt > 0:
+            sOutputMask.append(dMaskSchema[schemaItemKey])
+            iRemainder = int(iRemainder) - int(schemaItemKey)
+            # print("iRemainder: " + str(iRemainder))
+
+    return sOutputMask
+
+def winevt4663mask(argQuery):
+    lResult = translateMask(argQuery)
+
+    i = 0
+    strConcat = ""
+
+    for item in lResult:
+        if i > 0:
+            strConcat = strConcat + ", "
+        strConcat = strConcat + item
+        i = i + 1
+    
+    return strConcat
+
 def parseArgs(argQuery):
     dictArgs = {}
     sKey = ""
@@ -113,6 +164,8 @@ def doLookups(argQuery):
         return lookupDns(oArgs['key'])
     elif sLookup == "anom_url":
         return anomUrl(argQuery)
+    elif sLookup == "4663mask":
+        return winevt4663mask(oArgs['key'])
 
 class MyServer(BaseHTTPRequestHandler):
     def myLog( self, fmt, request, code, other ):
