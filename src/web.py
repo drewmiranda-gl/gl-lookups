@@ -117,14 +117,14 @@ def translateMask(argHexMask):
 
     iRemainder = iDec
 
+    # iterate through mask
     for schemaItemKey in dMaskSchema:
-        attempt = int(iRemainder) - int(schemaItemKey)
-        # print("")
-        # print("Attempt: " + str(attempt))
-        if attempt > 0:
+        # attempt = int(iRemainder) - int(schemaItemKey)
+
+        if int(schemaItemKey) <= int(iRemainder):
+            # print(schemaItemKey)
             sOutputMask.append(dMaskSchema[schemaItemKey])
             iRemainder = int(iRemainder) - int(schemaItemKey)
-            # print("iRemainder: " + str(iRemainder))
 
     return sOutputMask
 
