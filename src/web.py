@@ -14,7 +14,7 @@ parser = argparse.ArgumentParser(description="Just an example",
                                  formatter_class=argparse.ArgumentDefaultsHelpFormatter)
 parser.add_argument("--port", help="Port to bind to (TCP)", default="8080")
 parser.add_argument("--log", help="Output Log File", default="web.log")
-
+parser.add_argument('--exit', action=argparse.BooleanOptionalAction)
 
 args = parser.parse_args()
 configFromArg = vars(args)
@@ -214,14 +214,18 @@ class MyServer(BaseHTTPRequestHandler):
                 # print(excpInfo)
                 logging.error(excpInfo)
 
-if __name__ == "__main__":
-    webServer = HTTPServer((hostName, serverPort), MyServer)
-    print("Server started http://%s:%s" % (hostName, serverPort))
+if configFromArg['exit']:
+    rs = doLookups("lookup=4663mask&key=0x6")
+    print(rs)
+else:
+    if __name__ == "__main__":
+        webServer = HTTPServer((hostName, serverPort), MyServer)
+        print("Server started http://%s:%s" % (hostName, serverPort))
 
-    try:
-        webServer.serve_forever()
-    except KeyboardInterrupt:
-        pass
+        try:
+            webServer.serve_forever()
+        except KeyboardInterrupt:
+            pass
 
-    webServer.server_close()
-    print("Server stopped.")
+        webServer.server_close()
+        print("Server stopped.")
