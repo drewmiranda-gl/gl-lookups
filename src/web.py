@@ -15,6 +15,8 @@ parser = argparse.ArgumentParser(description="Just an example",
 parser.add_argument("--port", help="Port to bind to (TCP)", default="8080")
 parser.add_argument("--log", help="Output Log File", default="web.log")
 parser.add_argument('--exit', action=argparse.BooleanOptionalAction)
+parser.add_argument("--lookup")
+parser.add_argument("--key")
 
 args = parser.parse_args()
 configFromArg = vars(args)
@@ -215,7 +217,7 @@ class MyServer(BaseHTTPRequestHandler):
                 logging.error(excpInfo)
 
 if configFromArg['exit']:
-    rs = doLookups("lookup=4663mask&key=0x6")
+    rs = doLookups("lookup=" + configFromArg['lookup'] + "&key=" + configFromArg['key'])
     print(rs)
 else:
     if __name__ == "__main__":
