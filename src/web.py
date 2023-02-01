@@ -160,6 +160,7 @@ def lookupRDns(argQuery):
             # if a lookup exists in local sqlite, return that
             return {
                 "value": dbRs['name'],
+                "lookup": argQuery,
                 "meta": "Returned via sqlite cache",
                 "cached": 1
             }
