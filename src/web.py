@@ -120,11 +120,8 @@ def get_domain_name(ip_address):
     import socket
     socket.setdefaulttimeout(5)
 
-    try:
-        result=socket.gethostbyaddr(ip_address)
-        result = list(result)[0]
-    except Exception as e:
-        result = None
+    result=socket.gethostbyaddr(ip_address)
+    result = list(result)[0]
 
     return result
 
