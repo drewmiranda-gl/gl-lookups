@@ -189,12 +189,14 @@ def lookupRDns(argQuery):
         return {}
     else:
         result = get_domain_name(argQuery)
+
         # accommodate no result returned
         if "exception" in result:
             # if configFromArg['verbose'] == True:
             #     print("exeption is in result")
             # add to db for future exclusion
             addTimeoutIp(sDbFileName, argQuery)
+            return result
 
         return {
             "value": result,
@@ -345,10 +347,9 @@ class MyServer(BaseHTTPRequestHandler):
                 rs = doLookups(o.query)
 
                 if "exception" in rs:
-                    e = rs['exception']
-                    excpInfo = "" + str(e) + "; Query: " + str(o.query)
-                    dicRet = {}
-                    dicRet["err"] = excpInfo
+                    excpInfo = "" + str(rs['exception']) + "; Query: " + str(o.query)
+                    # dicRet = {}
+                    # dicRet["err"] = excpInfo
                     logging.error(excpInfo)
                     
                     dictRs['value'] = ""
@@ -356,7 +357,7 @@ class MyServer(BaseHTTPRequestHandler):
                 else:
                     if "cached" in rs:
                         if rs['cached'] == 1:
-                            logging.info("Cached=1, " + rs['meta'] + ": " + rs['value'])
+                            logging.info("Cached=1, " + rs['meta'] + ", " + rs['lookup'] + "=" + rs['value'])
                     dictRs['value'] = rs['value']
                 
                 y = json.dumps(dictRs)
