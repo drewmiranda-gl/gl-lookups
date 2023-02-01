@@ -153,7 +153,7 @@ def lookupRDns(argQuery):
                 print("Entry found in SQLite rDNS table, but no hostname saved. Returning Empty.")
             # return empty if no lookup is present, this will prevent this IP from
             #   causing a rDNS query timeout
-            return {}
+            return {"value": ""}
         else:
             if configFromArg['verbose'] == True:
                 print("Entry found in SQLite rDNS table. Returning cached hostname.")
