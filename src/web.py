@@ -19,6 +19,8 @@ parser.add_argument("--log", help="Output Log File", default="web.log")
 parser.add_argument('--exit', action=argparse.BooleanOptionalAction)
 parser.add_argument("--lookup")
 parser.add_argument("--key")
+parser.add_argument('--verbose', action=argparse.BooleanOptionalAction)
+parser.add_argument('--ignore_sqlite', action=argparse.BooleanOptionalAction)
 
 args = parser.parse_args()
 configFromArg = vars(args)
@@ -124,7 +126,7 @@ def get_domain_name(ip_address):
         result=socket.gethostbyaddr(ip_address)
         result = list(result)[0]
     except Exception as e:
-        result = None
+        result = {"exception": e}
 
     return result
 
@@ -139,16 +141,32 @@ def lookupRDns(argQuery):
     #   multicast/broadcast
 
     # Check sql lite database
-    dbRs = getDbRow(sDbFileName, "SELECT * FROM rdns WHERE ip = '" + str(argQuery) + "'")
+    if configFromArg['ignore_sqlite'] == True:
+        dbRs = []
+    else:
+        dbRs = getDbRow(sDbFileName, "SELECT * FROM rdns WHERE ip = '" + str(argQuery) + "'")
+
     # if IP is found
     if len(dbRs) > 0:
         if dbRs['has_lookup'] == False:
+            if configFromArg['verbose'] == True:
+                print("Entry found in SQLite rDNS table, but no hostname saved. Returning Empty.")
             # return empty if no lookup is present, this will prevent this IP from
             #   causing a rDNS query timeout
-            return ""
+            return {}
         else:
+            if configFromArg['verbose'] == True:
+                print("Entry found in SQLite rDNS table. Returning cached hostname.")
             # if a lookup exists in local sqlite, return that
-            return dbRs['name']
+            return {
+                "value": dbRs['name'],
+                "meta": "Returned via sqlite cache",
+                "cached": 1
+            }
+    else:
+        if configFromArg['verbose'] == True:
+            print("NO Entry found in SQLite rDNS table.")
+
 
     lIgnoreThese = ["239.255.255.250", "255.255.255.255"]
 
@@ -168,15 +186,21 @@ def lookupRDns(argQuery):
         result = "localhost"
 
     if bGiveResult == False:
-        return ""
+        return {}
     else:
         result = get_domain_name(argQuery)
         # accommodate no result returned
-        if result == None:
+        if "exception" in result:
+            # if configFromArg['verbose'] == True:
+            #     print("exeption is in result")
             # add to db for future exclusion
             addTimeoutIp(sDbFileName, argQuery)
 
-        return result
+        return {
+            "value": result,
+            "meta": "returned from rDNS query",
+            "cached": 0
+        }
 
 def lookupDns(argQuery):
     result = get_ipv4_by_hostname(argQuery)
@@ -319,15 +343,29 @@ class MyServer(BaseHTTPRequestHandler):
 
             try:
                 rs = doLookups(o.query)
-                dictRs['value'] = rs
+
+                if "exception" in rs:
+                    e = rs['exception']
+                    excpInfo = "" + str(e) + "; Query: " + str(o.query)
+                    dicRet = {}
+                    dicRet["err"] = excpInfo
+                    logging.error(excpInfo)
+                    
+                    dictRs['value'] = ""
+
+                else:
+                    if "cached" in rs:
+                        if rs['cached'] == 1:
+                            logging.info("Cached=1, " + rs['meta'] + ": " + rs['value'])
+                    dictRs['value'] = rs['value']
+                
                 y = json.dumps(dictRs)
                 self.wfile.write(bytes(y, "utf-8"))
+
             except Exception as e:
                 excpInfo = "" + str(e) + "; Query: " + str(o.query)
                 dicRet = {}
                 dicRet["err"] = excpInfo
-                # self.wfile.write(bytes(json.dumps(dicRet), "utf-8"))
-                # print(excpInfo)
                 logging.error(excpInfo)
 
 if configFromArg['exit']:
