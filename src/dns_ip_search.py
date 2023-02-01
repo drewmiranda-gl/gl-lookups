@@ -18,6 +18,8 @@ parser.add_argument("--verbose", help="Verbose output.", action=argparse.Boolean
 args = parser.parse_args()
 configFromArg = vars(args)
 
+sDbFileName = "searches.db"
+
 # font
 #           Style
 #           v Color
@@ -153,7 +155,7 @@ def getDbCur(sArgDbFile):
 def dbCreateTable(sArgDbFile):
     cur = getDbCur(sArgDbFile)['cur']
     try:
-        cur.execute("CREATE TABLE rdns(ip, name)")
+        cur.execute('CREATE TABLE "rdns" ("ip" TEXT,"name" TEXT,"has_lookup" INTEGER DEFAULT 0);')
     except:
         print(errorText + "ERROR, failed to create table `rdns`" + defText)
 
@@ -216,10 +218,98 @@ def parentIpSniff(sDbFileName, sArgIp):
     else:
         print(alertText + "No search result found for ip '" + str(sArgIp) + "'")
 
-sDbFileName = "searches.db"
-initDb(sDbFileName)
+def get_domain_name(ip_address):
+    import socket
+    socket.setdefaulttimeout(5)
+
+    try:
+        result=socket.gethostbyaddr(ip_address)
+        result = list(result)[0]
+    except Exception as e:
+        result = None
+
+    return result
+
+def lookupRDns(argQuery):
+    result = get_domain_name(argQuery)
+    return result
+
+def getRows(sArgDbFile, strSql):
+    lRs = []
+
+    lSchema = ['ip', 'name', 'has_lookup']
+
+    i = 0
+    d = {}
+
+    if exists(sArgDbFile):
+        cur = getDbCur(sArgDbFile)['cur']
+        try:
+            cur.execute(strSql)
+            rows = cur.fetchall()
+            for row in rows:
+                i = 0
+                d = {}
+                print("")
+                for schemaItem in lSchema:
+                    # print(schemaItem + ": " + str(row[i]))
+                    d[schemaItem] = row[i]
+                    i = i +1
+                lRs.append(d)
+            
+            return lRs
+        
+        except:
+            print(alertText + "ERROR returning rows.")
+            return {}
+
+def updateRow(sArgDbFile, strSql):
+    oDb = getDbCur(sArgDbFile)
+    cur = oDb['cur']
+    con = oDb['con']
+    try:
+        sSqlExec = strSql
+        cur.execute(sSqlExec)
+        con.commit()
+        print(successText + "Updated: '" + strSql + "'" + defText)
+    except:
+        print(errorText + "ERROR, failed update: '" + strSql + defText)
+
 
 # will collect IPs from a text file written from output of web.py when an IP has no result
 # iterate through list saving results found in graylog search
 # this can run on a schedule via cronjob to find hosts that may return an IP but don't have valid rdns/ptr record
-parentIpSniff(sDbFileName, "104.18.28.25")
+
+rows = getRows(sDbFileName, "SELECT * FROM rdns")
+for row in rows:
+    # dns query
+    print("rDNS lookup for " + row['ip'])
+    
+    dns_rs = lookupRDns(row['ip'])
+    # dns_rs = None
+    
+    bDnsFound = False
+    if dns_rs:
+        if len(dns_rs) > 0:
+            # if valid DNS result
+            # UPDATE record
+            bDnsFound = True
+    
+    if bDnsFound == True:
+        updateRow(sDbFileName, "UPDATE rdns SET name = '" + str(dns_rs) + "', has_lookup = 1 WHERE ip = '" + str(row['ip']) + "'")
+    else:
+        print(alertText + "NO DNS found, attempting Graylog Log Lookup: " + row['ip'])
+        ipLookupFound = queryGraylog(row['ip'])
+        bGraylogDnsLogFound = False
+        if ipLookupFound:
+            if len(ipLookupFound) > 0:
+                # if valid DNS result
+                # UPDATE record
+                bGraylogDnsLogFound = True
+        
+        if bGraylogDnsLogFound == True:
+            updateRow(sDbFileName, "UPDATE rdns SET name = '" + str(ipLookupFound) + "', has_lookup = 1 WHERE ip = '" + str(row['ip']) + "'")
+        else:
+            print(alertText + "No Graylog Log Lookup found: " + row['ip'])
+
+# parentIpSniff(sDbFileName, "104.18.28.25")
