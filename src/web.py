@@ -8,6 +8,8 @@ import argparse
 # import sys
 import logging
 import ipaddress
+import sqlite3
+from os.path import exists
 
 # defaults
 parser = argparse.ArgumentParser(description="Just an example",
@@ -24,6 +26,90 @@ configFromArg = vars(args)
 hostName = "localhost"
 serverPort = int(configFromArg['port'])
 logFile = str(configFromArg['log'])
+sDbFileName = "searches.db"
+
+def getDbCur(sArgDbFile):
+    con = sqlite3.connect(sArgDbFile)
+    cur = con.cursor()
+    return {"con": con, "cur": cur}
+
+def dbCreateTable(sArgDbFile):
+    cur = getDbCur(sArgDbFile)['cur']
+    try:
+        cur.execute('CREATE TABLE "rdns" ("ip" TEXT,"name" TEXT,"has_lookup" INTEGER DEFAULT 0);')
+    except:
+        # print(errorText + "ERROR, failed to create table `rdns`" + defText)
+        a = 1
+
+def initDb(sArgDbFile):
+    if exists(sArgDbFile):
+        cur = getDbCur(sArgDbFile)['cur']
+        # cur.execute("CREATE TABLE rdns(ip, name)")
+        try:
+            res = cur.execute("SELECT * FROM rdns")
+            iCount = 0
+            for row in res:
+                iCount = iCount + 1
+                break
+            
+            if iCount < 1:
+                dbCreateTable(sArgDbFile)
+        except:
+            dbCreateTable(sArgDbFile)
+        
+    else:
+        # print(alertText + "DB file doesnt exist, creating" + defText)
+        dbCreateTable(sArgDbFile)
+
+def getDbRow(sArgDbFile, strSql):
+    if exists(sArgDbFile):
+        cur = getDbCur(sArgDbFile)['cur']
+        try:
+            res = cur.execute(strSql)
+            ip, name, has_lookup = res.fetchone()
+
+            if has_lookup == int(1):
+                bHasLookup = True
+            else:
+                bHasLookup = False
+
+            dRs = {
+                "ip": ip,
+                "name": name,
+                "has_lookup": bHasLookup
+            }
+            return dRs
+        
+        except:
+            # dbCreateTable(sArgDbFile)
+            a = 1
+            return {}
+
+def addTimeoutIp(sArgDbFile, sArgIp):
+    # add IP address to sqllite db, will only add if does not already exist
+    oDb = getDbCur(sArgDbFile)
+    cur = oDb['cur']
+    con = oDb['con']
+
+    # does exist?
+    res = cur.execute("SELECT * FROM rdns WHERE ip = '" + str(sArgIp) + "'")
+    bExists = False
+    for row in res:
+        bExists = True
+        break
+
+    if bExists == False:
+        # Insert, does not already exist
+        try:
+            sSqlExec = "INSERT INTO rdns VALUES ('" + str(sArgIp) + "', '', '0')"
+            # print(sSqlExec)
+            cur.execute(sSqlExec)
+            con.commit()
+            # print("Inserted name for ip '" + str(sArgIp) + "'")
+        except Exception as e:
+            # print(e)
+            # print("ERROR, failed insert for ip '" + str(sArgIp) + "'")
+            a = 1
 
 def get_ipv4_by_hostname(hostname):
     import socket
@@ -31,9 +117,16 @@ def get_ipv4_by_hostname(hostname):
     return rs
 
 def get_domain_name(ip_address):
-  import socket
-  result=socket.gethostbyaddr(ip_address)
-  return list(result)[0]
+    import socket
+    socket.setdefaulttimeout(5)
+
+    try:
+        result=socket.gethostbyaddr(ip_address)
+        result = list(result)[0]
+    except Exception as e:
+        result = None
+
+    return result
 
 def lookupRDns(argQuery):
     # log to filter out/ignore
@@ -44,6 +137,18 @@ def lookupRDns(argQuery):
     #       127.16.0.0/12 (172.16.0.0 - 172.31.255.255)
     #       192.168.0.0/16 (192.168.0.0 - 192.168.255.255)
     #   multicast/broadcast
+
+    # Check sql lite database
+    dbRs = getDbRow(sDbFileName, "SELECT * FROM rdns WHERE ip = '" + str(argQuery) + "'")
+    # if IP is found
+    if len(dbRs) > 0:
+        if dbRs['has_lookup'] == False:
+            # return empty if no lookup is present, this will prevent this IP from
+            #   causing a rDNS query timeout
+            return ""
+        else:
+            # if a lookup exists in local sqlite, return that
+            return dbRs['name']
 
     lIgnoreThese = ["239.255.255.250", "255.255.255.255"]
 
@@ -66,6 +171,11 @@ def lookupRDns(argQuery):
         return ""
     else:
         result = get_domain_name(argQuery)
+        # accommodate no result returned
+        if result == None:
+            # add to db for future exclusion
+            addTimeoutIp(sDbFileName, argQuery)
+
         return result
 
 def lookupDns(argQuery):
@@ -171,6 +281,10 @@ def doLookups(argQuery):
         return winevt4663mask(oArgs['key'])
 
 class MyServer(BaseHTTPRequestHandler):
+    def setup(self):
+        BaseHTTPRequestHandler.setup(self)
+        self.request.settimeout(5)
+
     def myLog( self, fmt, request, code, other ):
         logging.basicConfig(filename=logFile, encoding='utf-8', level=logging.DEBUG)
         # syslog( LOG_INFO, '%s %s' % ( code, request) )
@@ -221,6 +335,7 @@ if configFromArg['exit']:
     print(rs)
 else:
     if __name__ == "__main__":
+        initDb(sDbFileName)
         webServer = HTTPServer((hostName, serverPort), MyServer)
         print("Server started http://%s:%s" % (hostName, serverPort))
 
