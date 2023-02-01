@@ -18,7 +18,7 @@ parser.add_argument("--verbose", help="Verbose output.", action=argparse.Boolean
 args = parser.parse_args()
 configFromArg = vars(args)
 
-sDbFileName = "searches.db"
+sDbFileName = "/opt/graylog/lookup-service/searches.db"
 
 # font
 #           Style
@@ -310,6 +310,7 @@ for row in rows:
         if bGraylogDnsLogFound == True:
             updateRow(sDbFileName, "UPDATE rdns SET name = '" + str(ipLookupFound) + "', has_lookup = 1 WHERE ip = '" + str(row['ip']) + "'")
         else:
-            print(alertText + "No Graylog Log Lookup found: " + row['ip'])
+            print(alertText + "No Graylog Log Lookup found: " + row['ip'] + defText)
 
 # parentIpSniff(sDbFileName, "104.18.28.25")
+print(defText)
