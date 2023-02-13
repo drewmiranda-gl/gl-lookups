@@ -261,7 +261,6 @@ def translateMask(argHexMask):
         # attempt = int(iRemainder) - int(schemaItemKey)
 
         if int(schemaItemKey) <= int(iRemainder):
-            # print(schemaItemKey)
             sOutputMask.append(dMaskSchema[schemaItemKey])
             iRemainder = int(iRemainder) - int(schemaItemKey)
 
@@ -279,7 +278,7 @@ def winevt4663mask(argQuery):
         strConcat = strConcat + item
         i = i + 1
     
-    return strConcat
+    return {"value": strConcat}
 
 def parseArgs(argQuery):
     dictArgs = {}
