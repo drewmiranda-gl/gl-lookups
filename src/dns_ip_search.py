@@ -32,6 +32,8 @@ successText = "\033[1;32;50m"
 
 print(defText)
 
+print("Script START - dns_ip_search")
+
 # Colors
 # 
 # Example
@@ -280,9 +282,11 @@ def updateRow(sArgDbFile, strSql):
 # iterate through list saving results found in graylog search
 # this can run on a schedule via cronjob to find hosts that may return an IP but don't have valid rdns/ptr record
 
+i=0
 rows = getRows(sDbFileName, "SELECT * FROM rdns")
 for row in rows:
     # dns query
+    print("Metrics: Entries looked up [" + str(i) + "]")
     print("rDNS lookup for " + row['ip'])
     
     dns_rs = lookupRDns(row['ip'])
@@ -311,6 +315,8 @@ for row in rows:
             updateRow(sDbFileName, "UPDATE rdns SET name = '" + str(ipLookupFound) + "', has_lookup = 1 WHERE ip = '" + str(row['ip']) + "'")
         else:
             print(alertText + "No Graylog Log Lookup found: " + row['ip'] + defText)
+    i=i+1
 
 # parentIpSniff(sDbFileName, "104.18.28.25")
+print("Script END - dns_ip_search")
 print(defText)
