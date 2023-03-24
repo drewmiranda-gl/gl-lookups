@@ -6,8 +6,10 @@ sudo adduser --system --disabled-password --disabled-login --home /var/empty --n
 sudo mkdir -p /opt/graylog/lookup-service
 
 # copy files
-sudo cp web.py /opt/graylog/lookup-service
-sudo cp update.sh /opt/graylog/lookup-service
+
+sudo cp -f service-wrapper.sh /opt/graylog/lookup-service
+sudo chmod +x /opt/graylog/lookup-service/service-wrapper.sh
+
 sudo chmod +x /opt/graylog/lookup-service/update.sh
 
 # set owner

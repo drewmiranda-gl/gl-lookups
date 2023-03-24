@@ -10,7 +10,7 @@ Group=gl_lookup_service
 WorkingDirectory=/opt/graylog/lookup-service
 Type=simple
 Restart=always
-ExecStart=/usr/bin/python3 /opt/graylog/lookup-service/web.py --port 8082 --log web2.log
+ExecStart=/opt/graylog/lookup-service/service-wrapper.sh 8082 /opt/graylog/lookup-service/web2.log
 
 [Install]
 WantedBy=multi-user.target
