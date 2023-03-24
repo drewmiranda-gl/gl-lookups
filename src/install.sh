@@ -10,10 +10,12 @@ sudo adduser --system --disabled-password --disabled-login --home /var/empty --n
 sudo mkdir -p /opt/graylog/lookup-service
 
 # copy files
+sudo cp -f web.py /opt/graylog/lookup-service
 
 sudo cp -f service-wrapper.sh /opt/graylog/lookup-service
 sudo chmod +x /opt/graylog/lookup-service/service-wrapper.sh
 
+sudo cp -f update.sh /opt/graylog/lookup-service
 sudo chmod +x /opt/graylog/lookup-service/update.sh
 
 # set owner
@@ -22,8 +24,8 @@ touch /opt/graylog/lookup-service/web2.log
 sudo chown -R gl_lookup_service:gl_lookup_service /opt/graylog/lookup-service/
 
 # install service.....
-sudo cp gl_lookup.service /etc/systemd/system/gl_lookup.service
-sudo cp gl_lookup2.service /etc/systemd/system/gl_lookup2.service
+sudo cp -f gl_lookup.service /etc/systemd/system/gl_lookup.service
+sudo cp -f gl_lookup2.service /etc/systemd/system/gl_lookup2.service
 
 sudo systemctl daemon-reload
 
