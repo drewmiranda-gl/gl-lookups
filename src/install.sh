@@ -1,3 +1,7 @@
+# haproxy
+sudo apt install -y haproxy
+cp -f haproxy/haproxy.cfg /etc/haproxy/
+
 # create service user
 # gl_lookup_service
 sudo adduser --system --disabled-password --disabled-login --home /var/empty --no-create-home --quiet --force-badname --group gl_lookup_service
@@ -29,3 +33,5 @@ sudo systemctl start gl_lookup.service
 
 sudo systemctl enable gl_lookup2.service
 sudo systemctl start gl_lookup2.service
+
+sudo systemctl restart haproxy
