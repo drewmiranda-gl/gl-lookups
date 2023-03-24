@@ -17,10 +17,9 @@ sudo chmod +x /opt/graylog/lookup-service/service-wrapper.sh
 sudo chmod +x /opt/graylog/lookup-service/update.sh
 
 # set owner
-sudo -u gl_lookup_service touch /opt/graylog/lookup-service/web1.log
-sudo -u gl_lookup_service touch /opt/graylog/lookup-service/web2.log
+touch /opt/graylog/lookup-service/web1.log
+touch /opt/graylog/lookup-service/web2.log
 sudo chown -R gl_lookup_service:gl_lookup_service /opt/graylog/lookup-service/
-
 
 # install service.....
 sudo cp gl_lookup.service /etc/systemd/system/gl_lookup.service
