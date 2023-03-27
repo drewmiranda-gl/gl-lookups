@@ -7,6 +7,8 @@ import argparse
 import re
 import sqlite3
 from os.path import exists
+import urllib3
+urllib3.disable_warnings(urllib3.exceptions.InsecureRequestWarning)
 
 # defaults
 parser = argparse.ArgumentParser(description="Just an example",
