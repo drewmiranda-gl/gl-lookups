@@ -11,6 +11,9 @@ sudo mkdir -p /opt/graylog/lookup-service
 
 # copy files
 sudo cp -f web.py /opt/graylog/lookup-service
+sudo cp -f dns_ip_search.py /opt/graylog/lookup-service
+sudo cp -f config.ini /opt/graylog/lookup-service
+sudo mv -f /opt/graylog/lookup-service/config.ini /opt/graylog/lookup-service/auth.ini
 
 sudo cp -f service-wrapper.sh /opt/graylog/lookup-service
 sudo chmod +x /opt/graylog/lookup-service/service-wrapper.sh
