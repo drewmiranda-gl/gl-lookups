@@ -16,6 +16,7 @@ parser = argparse.ArgumentParser(description="Just an example",
 parser.add_argument("--debug", "-d", help="For debugging", action=argparse.BooleanOptionalAction)
 parser.add_argument("--config", help="Config Filename", default="config.ini")
 parser.add_argument("--verbose", help="Verbose output.", action=argparse.BooleanOptionalAction, default=False)
+parser.add_argument("--delete-stale", help="Deletes stale records with no lookup.", action=argparse.BooleanOptionalAction, default=False)
 parser.add_argument("--db", help="Config Filename", default="/opt/graylog/lookup-service/searches.db")
 
 args = parser.parse_args()
@@ -280,6 +281,26 @@ def updateRow(sArgDbFile, strSql):
     except:
         print(errorText + "ERROR, failed update: '" + strSql + defText)
 
+def deleteStatement(sArgDbFile, strSql):
+    oDb = getDbCur(sArgDbFile)
+    cur = oDb['cur']
+    con = oDb['con']
+    try:
+        sSqlExec = strSql
+        cur.execute(sSqlExec)
+        con.commit()
+        print(successText + "Deleted: '" + strSql + "'" + defText)
+    except:
+        print(errorText + "ERROR, failed delete: '" + strSql + defText)
+
+def doDeleteStaleRecordsThatDoNotHaveLookupValue(sArgDbFile):
+    sDeleteStmnt = "DELETE FROM rdns WHERE has_lookup = 0;"
+    deleteStatement(sArgDbFile, sDeleteStmnt)
+
+if configFromArg['delete_stale']:
+    print("Deleting stale records that do not have a lookup value")
+    doDeleteStaleRecordsThatDoNotHaveLookupValue(sDbFileName)
+    exit()
 
 # will collect IPs from a text file written from output of web.py when an IP has no result
 # iterate through list saving results found in graylog search
