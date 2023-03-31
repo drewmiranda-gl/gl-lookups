@@ -5,3 +5,4 @@ src/haproxy/fields_names.txt
 src/haproxy/regex.txt
 src/*.db
 src/*.ini
+src/test/*
