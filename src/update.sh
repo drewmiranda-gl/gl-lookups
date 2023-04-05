@@ -8,7 +8,7 @@ sudo chown -R gl_lookup_service:gl_lookup_service /opt/graylog/lookup-service/
 echo Restarting gl_lookup.service
 sudo systemctl stop gl_lookup.service
 sleep 1
-rm -f /opt/graylog/lookup-service/web1.log
+sudo rm -f /opt/graylog/lookup-service/web1.log
 sleep 1
 sudo systemctl start gl_lookup.service
 
@@ -18,6 +18,6 @@ sleep 60
 echo Restarting gl_lookup2.service
 sudo systemctl stop gl_lookup2.service
 sleep 1
-rm -f /opt/graylog/lookup-service/web2.log
+sudo rm -f /opt/graylog/lookup-service/web2.log
 sleep 1
 sudo systemctl start gl_lookup2.service
