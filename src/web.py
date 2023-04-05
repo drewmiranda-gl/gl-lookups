@@ -32,45 +32,65 @@ serverPort = int(configFromArg['port'])
 logFile = str(configFromArg['log'])
 sDbFileName = args.db
 
+def getUnixTimeUtc():
+    from datetime import datetime
+    utime = datetime.utcnow().timestamp()
+    return int(round(utime, 0))
+
 def getDbCur(sArgDbFile):
     con = sqlite3.connect(sArgDbFile)
     cur = con.cursor()
     return {"con": con, "cur": cur}
 
-def dbCreateTable(sArgDbFile):
-    cur = getDbCur(sArgDbFile)['cur']
-    try:
-        cur.execute('CREATE TABLE "rdns" ("ip" TEXT,"name" TEXT,"has_lookup" INTEGER DEFAULT 0);')
-    except:
-        # print(errorText + "ERROR, failed to create table `rdns`" + defText)
-        a = 1
+def dbExecute(sArgDbFile, stmnt):
+    if args.debug == False:
+        cur = getDbCur(sArgDbFile)['cur']
+
+        try:
+            # cur.execute('CREATE TABLE "rdns" ("ip" TEXT,"name" TEXT,"has_lookup" INTEGER DEFAULT 0);')
+            cur.execute(stmnt)
+
+        except Exception as e:
+            # print(e)
+            # print(errorText + "ERROR, failed to create table `rdns`" + defText)
+            a = 1
+    else:
+        print("DEBUG: Skipping dbCreateTable()")
 
 def initDb(sArgDbFile):
+    create_table_statement = 'CREATE TABLE "rdns" ("ip" TEXT, "name" TEXT, "has_lookup" INTEGER DEFAULT 0, "ttl" INTEGER DEFAULT 86400, "date_created" INTEGER DEFAULT 0);'
+
     if exists(sArgDbFile):
         cur = getDbCur(sArgDbFile)['cur']
         # cur.execute("CREATE TABLE rdns(ip, name)")
         try:
-            res = cur.execute("SELECT * FROM rdns")
-            iCount = 0
-            for row in res:
-                iCount = iCount + 1
-                break
-            
-            if iCount < 1:
-                dbCreateTable(sArgDbFile)
+            res = cur.execute("SELECT ip, name, has_lookup FROM rdns")
         except:
-            dbCreateTable(sArgDbFile)
+            print("Creating database using " + str(sArgDbFile))
+            dbExecute(sArgDbFile, create_table_statement)
+        
+        try:
+            res = cur.execute("SELECT ttl FROM rdns")
+        except:
+            print("Adding 'ttl' column using " + str(sArgDbFile))
+            dbExecute(sArgDbFile, 'ALTER TABLE rdns ADD "ttl" INTEGER DEFAULT 86400')
+        
+        try:
+            res = cur.execute("SELECT date_created FROM rdns")
+        except:
+            print("Adding 'date_created', 'date_created' column using " + str(sArgDbFile))
+            dbExecute(sArgDbFile, 'ALTER TABLE rdns ADD "date_created" INTEGER DEFAULT 0')
         
     else:
-        # print(alertText + "DB file doesnt exist, creating" + defText)
-        dbCreateTable(sArgDbFile)
+        print("Creating database using " + str(sArgDbFile))
+        dbExecute(sArgDbFile, create_table_statement)
 
 def getDbRow(sArgDbFile, strSql):
     if exists(sArgDbFile):
         cur = getDbCur(sArgDbFile)['cur']
         try:
             res = cur.execute(strSql)
-            ip, name, has_lookup = res.fetchone()
+            ip, name, has_lookup, ttl, date_created = res.fetchone()
 
             if has_lookup == int(1):
                 bHasLookup = True
@@ -80,16 +100,33 @@ def getDbRow(sArgDbFile, strSql):
             dRs = {
                 "ip": ip,
                 "name": name,
-                "has_lookup": bHasLookup
+                "has_lookup": bHasLookup,
+                "ttl": ttl,
+                "date_created": date_created
             }
             return dRs
         
-        except:
+        except Exception as e:
+            # print(e)
             # dbCreateTable(sArgDbFile)
             a = 1
             return {}
 
-def addTimeoutIp(sArgDbFile, sArgIp):
+def deleteIp(sArgDbFile, sArgIp):
+    print("Deleting IP: " + str(sArgIp))
+
+    oDb = getDbCur(sArgDbFile)
+    cur = oDb['cur']
+    con = oDb['con']
+    try:
+        sSqlExec = "DELETE FROM rdns WHERE ip = '" + str(sArgIp) + "'"
+        cur.execute(sSqlExec)
+        con.commit()
+    except Exception as e:
+        a = 1
+
+def addTimeoutIp(sArgDbFile, sArgIp, sArgHostname):
+    print("Adding IP to cache: " + str(sArgIp))
     # add IP address to sqllite db, will only add if does not already exist
     oDb = getDbCur(sArgDbFile)
     cur = oDb['cur']
@@ -102,14 +139,20 @@ def addTimeoutIp(sArgDbFile, sArgIp):
         bExists = True
         break
 
+    if len(sArgHostname) > 0:
+        has_lookup = 1
+    else:
+        has_lookup = 0
+
     if bExists == False:
         # Insert, does not already exist
         try:
-            sSqlExec = "INSERT INTO rdns VALUES ('" + str(sArgIp) + "', '', '0')"
-            # print(sSqlExec)
+            unix_time = str(getUnixTimeUtc())
+            sSqlExec = "INSERT INTO rdns VALUES ('" + str(sArgIp) + "', '" + str(sArgHostname) + "', '" + str(has_lookup) + "', 604800, " + unix_time + ")"
+            print(sSqlExec)
             cur.execute(sSqlExec)
             con.commit()
-            # print("Inserted name for ip '" + str(sArgIp) + "'")
+            
         except Exception as e:
             # print(e)
             # print("ERROR, failed insert for ip '" + str(sArgIp) + "'")
@@ -147,25 +190,37 @@ def lookupRDns(argQuery):
         dbRs = []
     else:
         dbRs = getDbRow(sDbFileName, "SELECT * FROM rdns WHERE ip = '" + str(argQuery) + "'")
-
+        
     # if IP is found
     if len(dbRs) > 0:
-        if dbRs['has_lookup'] == False:
-            if configFromArg['verbose'] == True:
-                print("Entry found in SQLite rDNS table, but no hostname saved. Returning Empty.")
-            # return empty if no lookup is present, this will prevent this IP from
-            #   causing a rDNS query timeout
-            return {"value": ""}
+        if configFromArg['verbose'] == True:
+            print(json.dumps(dbRs))
+
+        # check for TTL expiration
+        unix_time_now_utc = getUnixTimeUtc()
+        ttl = dbRs['ttl']
+        date_created = dbRs['date_created']
+        if date_created + ttl < unix_time_now_utc:
+            print("TTL has expired!")
+            # delete record
+            deleteIp(sDbFileName, argQuery)
         else:
-            if configFromArg['verbose'] == True:
-                print("Entry found in SQLite rDNS table. Returning cached hostname.")
-            # if a lookup exists in local sqlite, return that
-            return {
-                "value": dbRs['name'],
-                "lookup": argQuery,
-                "meta": "Returned via sqlite cache",
-                "cached": 1
-            }
+            if dbRs['has_lookup'] == False:
+                if configFromArg['verbose'] == True:
+                    print("Entry found in SQLite rDNS table, but no hostname saved. Returning Empty.")
+                # return empty if no lookup is present, this will prevent this IP from
+                #   causing a rDNS query timeout
+                return {"value": ""}
+            else:
+                if configFromArg['verbose'] == True:
+                    print("Entry found in SQLite rDNS table. Returning cached hostname.")
+                # if a lookup exists in local sqlite, return that
+                return {
+                    "value": dbRs['name'],
+                    "lookup": argQuery,
+                    "meta": "Returned via sqlite cache",
+                    "cached": 1
+                }
     else:
         if configFromArg['verbose'] == True:
             print("NO Entry found in SQLite rDNS table.")
@@ -193,13 +248,14 @@ def lookupRDns(argQuery):
     else:
         result = get_domain_name(argQuery)
 
-        # accommodate no result returned
         if "exception" in result:
             # if configFromArg['verbose'] == True:
             #     print("exeption is in result")
             # add to db for future exclusion
-            addTimeoutIp(sDbFileName, argQuery)
+            addTimeoutIp(sDbFileName, argQuery, '')
             return result
+        else:
+            addTimeoutIp(sDbFileName, argQuery, result)
 
         return {
             "value": result,
