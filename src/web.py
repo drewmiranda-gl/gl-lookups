@@ -21,6 +21,7 @@ parser.add_argument("--lookup")
 parser.add_argument("--key")
 parser.add_argument('--verbose', action=argparse.BooleanOptionalAction)
 parser.add_argument('--ignore_sqlite', action=argparse.BooleanOptionalAction)
+parser.add_argument("--db", help="Sqlite DB File", default="searches.db")
 
 args = parser.parse_args()
 configFromArg = vars(args)
@@ -28,7 +29,7 @@ configFromArg = vars(args)
 hostName = "localhost"
 serverPort = int(configFromArg['port'])
 logFile = str(configFromArg['log'])
-sDbFileName = "searches.db"
+sDbFileName = args.db
 
 def getDbCur(sArgDbFile):
     con = sqlite3.connect(sArgDbFile)
