@@ -20,6 +20,7 @@ parser.add_argument('--exit', action=argparse.BooleanOptionalAction)
 parser.add_argument("--lookup")
 parser.add_argument("--key")
 parser.add_argument('--verbose', action=argparse.BooleanOptionalAction)
+parser.add_argument('--debug', action=argparse.BooleanOptionalAction, default=False)
 parser.add_argument('--ignore_sqlite', action=argparse.BooleanOptionalAction)
 parser.add_argument("--db", help="Sqlite DB File", default="searches.db")
 
