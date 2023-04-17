@@ -378,6 +378,10 @@ class MyServer(BaseHTTPRequestHandler):
         logging.info('%s %s' % ( code, request))
 
     def do_GET(self):
+        bSuccess = True
+        writeOutput = ""
+        iHttpResp = 404     # Not Found
+        
         self.log_message = self.myLog
 
         # self.send_response(200)
@@ -400,14 +404,13 @@ class MyServer(BaseHTTPRequestHandler):
             #       and having a scheduler periodically validating the cache, keeping it fresh
             #       goal is to improve throughput of DNS lookups
 
-            self.send_response(200)
-            self.send_header("Content-type", "application/json")
-            self.end_headers()
-
             try:
                 rs = doLookups(o.query)
 
                 if "exception" in rs:
+                    bSuccess = False
+                    iHttpResp = 500     # Internal Server Error
+                    
                     excpInfo = "" + str(rs['exception']) + "; Query: " + str(o.query)
                     # dicRet = {}
                     # dicRet["err"] = excpInfo
@@ -422,13 +425,33 @@ class MyServer(BaseHTTPRequestHandler):
                     dictRs['value'] = rs['value']
                 
                 y = json.dumps(dictRs)
-                self.wfile.write(bytes(y, "utf-8"))
+                writeOutput = y
 
             except Exception as e:
+                bSuccess = False
+                iHttpResp = 400     # Bad Request
+
                 excpInfo = "" + str(e) + "; Query: " + str(o.query)
                 dicRet = {}
                 dicRet["err"] = excpInfo
                 logging.error(excpInfo)
+            
+            if bSuccess == True:
+                iHttpResp = 200     # OK
+
+            # return 404 not found if returned value is empty and there is not already an http return error code set
+            if "value" in dictRs:
+                if dictRs['value'] == "" and iHttpResp == 200:
+                    iHttpResp = 404     # Not Found
+            
+        elif o.path == "/favicon.ico":
+            iHttpResp = 404     # Not Found
+        
+        self.send_response(iHttpResp)
+        self.send_header("Content-type", "application/json")
+        self.end_headers()
+        self.wfile.write(bytes(writeOutput, "utf-8"))
+
 
 if configFromArg['exit']:
     rs = doLookups("lookup=" + configFromArg['lookup'] + "&key=" + configFromArg['key'])
