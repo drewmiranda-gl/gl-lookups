@@ -378,11 +378,12 @@ class MyServer(BaseHTTPRequestHandler):
         logging.info('%s %s' % ( code, request))
 
     def do_GET(self):
+        http_write_output = ""
         self.log_message = self.myLog
 
-        # self.send_response(200)
-        # self.send_header("Content-type", "application/json")
-        # self.end_headers()
+        
+        
+        
         
         # self.wfile.write(bytes("%s" % self.path, "utf-8"))
         # print(self.path)
@@ -400,35 +401,46 @@ class MyServer(BaseHTTPRequestHandler):
             #       and having a scheduler periodically validating the cache, keeping it fresh
             #       goal is to improve throughput of DNS lookups
 
-            self.send_response(200)
-            self.send_header("Content-type", "application/json")
-            self.end_headers()
-
             try:
                 rs = doLookups(o.query)
 
                 if "exception" in rs:
+                    self.send_response(500)
                     excpInfo = "" + str(rs['exception']) + "; Query: " + str(o.query)
                     # dicRet = {}
                     # dicRet["err"] = excpInfo
                     logging.error(excpInfo)
                     
                     dictRs['value'] = ""
-
                 else:
+                    if rs['value'] == "":
+                        self.send_response(404)
+                    else:
+                        self.send_response(200)
+                    
                     if "cached" in rs:
                         if rs['cached'] == 1:
                             logging.info("Cached=1, " + rs['meta'] + ", " + rs['lookup'] + "=" + rs['value'])
                     dictRs['value'] = rs['value']
                 
                 y = json.dumps(dictRs)
-                self.wfile.write(bytes(y, "utf-8"))
+                http_write_output = y
 
             except Exception as e:
+                self.send_response(400)
                 excpInfo = "" + str(e) + "; Query: " + str(o.query)
                 dicRet = {}
                 dicRet["err"] = excpInfo
                 logging.error(excpInfo)
+        elif o.path == "/favicon.ico":
+            http_write_output = ""
+            self.send_response(200)
+        else:
+            self.send_response(404)
+
+        self.send_header("Content-type", "application/json")
+        self.end_headers()
+        self.wfile.write(bytes(http_write_output, "utf-8"))
 
 if configFromArg['exit']:
     rs = doLookups("lookup=" + configFromArg['lookup'] + "&key=" + configFromArg['key'])
