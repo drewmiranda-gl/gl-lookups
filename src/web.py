@@ -244,7 +244,10 @@ def lookupRDns(argQuery):
         result = "localhost"
 
     if bGiveResult == False:
-        return {}
+        return {
+            "value": "",
+            "meta": "query ignored, no result returned."
+        }
     else:
         result = get_domain_name(argQuery)
 
