@@ -1,3 +1,8 @@
+# TODO
+# - rewrite caching
+#   - add functions
+# - add generic web query function
+
 from http.server import BaseHTTPRequestHandler, HTTPServer
 from unittest import result
 from urllib.parse import urlparse
@@ -10,7 +15,9 @@ import logging
 import ipaddress
 import sqlite3
 from os.path import exists
-
+import requests
+import mariadb
+import mysql.connector
 # defaults
 parser = argparse.ArgumentParser(description="Just an example",
                                  formatter_class=argparse.ArgumentDefaultsHelpFormatter)
@@ -23,6 +30,7 @@ parser.add_argument('--verbose', action=argparse.BooleanOptionalAction)
 parser.add_argument('--debug', action=argparse.BooleanOptionalAction, default=False)
 parser.add_argument('--ignore_sqlite', action=argparse.BooleanOptionalAction)
 parser.add_argument("--db", help="Sqlite DB File", default="searches.db")
+parser.add_argument('--log_response', action=argparse.BooleanOptionalAction, default=False)
 
 args = parser.parse_args()
 configFromArg = vars(args)
@@ -84,6 +92,112 @@ def initDb(sArgDbFile):
     else:
         print("Creating database using " + str(sArgDbFile))
         dbExecute(sArgDbFile, create_table_statement)
+
+def mariadb_get_cur(mdb_hostname: str, mdb_port: int, mdb_username: str, mdb_password: str):
+    # Connect to MariaDB Platform
+    try:
+        conn = mariadb.connect(
+            user=mdb_username,
+            password=mdb_password,
+            host=mdb_hostname,
+            port=mdb_port,
+            database="graylog_lookups"
+        )
+
+    except mariadb.Error as e:
+        print(f"Error connecting to MariaDB Platform: {e}")
+        if "Unknown database" in str(e):
+            return {
+                "error": "unknown database"
+            }
+        else:
+            return {
+                "error": str(e)
+            }
+
+    # Get Cursor
+    cur = conn.cursor()
+    return {
+        "cursor": cur
+    }
+
+def create_cache_db(mdb_hostname: str, mdb_port: int, mdb_username: str, mdb_password: str):
+    mydb = mysql.connector.connect(
+        host=mdb_hostname,
+        port=mdb_port,
+        user=mdb_username,
+        password=mdb_password
+    )
+
+    mycursor = mydb.cursor()
+
+    mycursor.execute("show tables")
+
+def get_table_create_sql(tablename: str):
+    sql = ""
+
+    if tablename == "rdns":
+
+        # ip            TEXT
+        # name          TEXT
+        # has_lookup    INT (0/1)
+        # ttl           INT
+        # date_created  INT
+
+        sql = ('"CREATE TABLE rdns (' + '\n' +
+                    'uid MEDIUMINT NOT NULL AUTO_INCREMENT,' + '\n' +
+                    'ip VARCHAR(15) NOT NULL,' + '\n' +
+                    'name TEXT,' + '\n' +
+                    'has_lookup TINYINT(1) DEFAULT 0 NOT NULL,' + '\n' +
+                    'ttl VARCHAR(15) NULL,' + '\n' +
+                    'date_created VARCHAR(15) NOT NULL,' + '\n' +
+                    'PRIMARY KEY (id)' + '\n' +
+                ');"')
+    
+    return sql
+
+def create_cache_table(mdb_hostname: str, mdb_port: int, mdb_username: str, mdb_password: str, tablename: str):
+    # rs_cur = mariadb_get_cur(mdb_hostname, mdb_port, mdb_username, mdb_password)
+    # rs_cur["cursor"].execute("show tables")
+    table_create_sql = get_table_create_sql(tablename)
+    print(table_create_sql)
+
+def init_cache_db(hostname: str, port: int, username: str, password: str):
+    # test if DB exists
+    rs_cur = mariadb_get_cur(hostname, port, username, password)
+    if "error" in rs_cur:
+        if rs_cur['error'] == "unknown database":
+            print("database missing let us create it!")
+            # create missing database
+            create_cache_db(hostname, port, username, password)
+            # retest
+            rs_cur = mariadb_get_cur(hostname, port, username, password)
+            if "error" in rs_cur:
+                return False
+        
+    # init tables?
+    l_cache_tables = []
+    l_cache_tables.append("rdns")
+
+    l_existing_tables = []
+
+    # get list of tables
+    # l_tables = exec_query_db(rs_cur, "show tables")
+    rs_cur["cursor"].execute("show tables")
+    if rs_cur["cursor"]:
+        for table_name in rs_cur["cursor"]:
+            if len(table_name):
+                # print(table_name[0])
+                l_existing_tables.append(str(table_name[0]))
+
+    for table_name in l_cache_tables:
+        if not table_name in l_existing_tables:
+            print("Table does not exist, we need to create it: " + str(table_name))
+            create_cache_table(hostname, port, username, password, str(table_name))
+
+
+    return True
+
 
 def getDbRow(sArgDbFile, strSql):
     if exists(sArgDbFile):
@@ -291,6 +405,51 @@ def anomUrl(argQuery):
     strConcat = strConcat + "&to=" + endTime + "Z"
     return strConcat
 
+def mergeDict(dictOrig: dict, dictToAdd: dict, allowReplacements: bool):
+    for item in dictToAdd:
+        
+        bSet = True
+        if item in dictOrig:
+            if allowReplacements == False:
+                bSet = False
+        
+        if bSet == True:
+            dictOrig[item] = dictToAdd[item]
+    
+    return dictOrig
+
+def query_virus_total(query_arg_key: str, query_type: str):
+    sUrl = "https://www.virustotal.com/api/v3/" + str(query_type) + "/" + str(query_arg_key)
+
+    sHeaders = {
+            "Accept":"application/json",
+            "X-Requested-By":"python-requests",
+            "x-apikey": "214e6bd1febea3c1490efe980e48669bb2a178d4aa427a221f86754cdf73d3c0"
+        }
+    # sHeaders = mergeDict(sHeaders, {}, True)
+
+    args_for_req = {}
+    args_for_req["url"] = sUrl
+    # args_for_req["json"] = argJson
+    args_for_req["headers"] = sHeaders
+    # args_for_req["verify"] = False
+    # args_for_req["auth"] = HTTPBasicAuth(sArgUser, sArgPw)
+
+    try:
+        # r = requests.delete(sUrl, json = argJson, headers=sHeaders, verify=False, auth=HTTPBasicAuth(sArgUser, sArgPw))
+        r = requests.get(**args_for_req)
+
+        # print(r.status_code)
+        # print(r.headers)
+        # print(r.text)
+        # exit()
+        return json.loads(r.text)
+    except Exception as e:
+        return {
+            "success": False,
+            "exception": e
+        }
+
 def translateMask(argHexMask):
     # return argHexMask
     iDec = int(argHexMask, 16)
@@ -341,6 +500,13 @@ def winevt4663mask(argQuery):
     
     return {"value": strConcat}
 
+def virus_total_hash(arg_query):
+    rs_json = query_virus_total(arg_query, "files")
+    return {
+        "value": rs_json,
+        "lookup": str(arg_query)
+    }
+
 def parseArgs(argQuery):
     dictArgs = {}
     sKey = ""
@@ -366,6 +532,8 @@ def doLookups(argQuery):
         return anomUrl(argQuery)
     elif sLookup == "4663mask":
         return winevt4663mask(oArgs['key'])
+    elif sLookup == "vt_hash":
+        return virus_total_hash(oArgs['key'])
 
 class MyServer(BaseHTTPRequestHandler):
     def setup(self):
@@ -417,7 +585,14 @@ class MyServer(BaseHTTPRequestHandler):
                         self.send_response(404)
                     else:
                         self.send_response(200)
-                    
+                        if args.log_response == True:
+                            input_args_for_logging = parseArgs(o.query)
+                            log_dict = {
+                                "lookup": input_args_for_logging['lookup'],
+                                "key": input_args_for_logging['key'],
+                                "result": rs['value']
+                            }
+                            logging.info(log_dict)
                     if "cached" in rs:
                         if rs['cached'] == 1:
                             logging.info("Cached=1, " + rs['meta'] + ", " + rs['lookup'] + "=" + rs['value'])
@@ -448,6 +623,11 @@ if configFromArg['exit']:
 else:
     if __name__ == "__main__":
         initDb(sDbFileName)
+        init_db_success = init_cache_db("127.0.0.1", 3306, "root", "")
+        if init_cache_db == False:
+            print("ERROR! Failed to initialize graylog_lookups MariaDB database.")
+            exit(1)
+        exit()
         webServer = HTTPServer((hostName, serverPort), MyServer)
         print("Server started http://%s:%s" % (hostName, serverPort))
 

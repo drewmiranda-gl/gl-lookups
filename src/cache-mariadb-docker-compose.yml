@@ -1,0 +1,14 @@
+version: '3.8'
+
+services:
+
+  database:
+    image: mariadb:latest
+    container_name: mariadb
+    # restart: unless-stopped
+    environment:
+      MARIADB_ALLOW_EMPTY_ROOT_PASSWORD: "true"
+    ports:
+      - 3306:3306
+    volumes:
+      - ./storage/datadir:/var/lib/mysql
