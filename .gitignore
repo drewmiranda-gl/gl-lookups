@@ -6,3 +6,4 @@ src/haproxy/regex.txt
 src/*.db
 src/*.ini
 src/test/*
+src/storage/*
