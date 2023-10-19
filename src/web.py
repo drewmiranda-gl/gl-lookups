@@ -574,7 +574,6 @@ def lookupRDns(argQuery):
         else:
             has_lookup = 0
         dict_to_cache["has_lookup"] = has_lookup
-        logging.debug("args.debug_save_in_mariadb_cache = " + str(args.debug_save_in_mariadb_cache))
 
         if "exception" in result:
             # if configFromArg['verbose'] == True:
