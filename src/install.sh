@@ -1,3 +1,8 @@
+# python
+
+sudo apt-get -y install mariadb-client libmariadb3 libmariadb-dev
+sudo python3 -m pip install -r requirements.txt
+
 # haproxy
 sudo apt install -y haproxy
 cp -f haproxy/haproxy.cfg /etc/haproxy/
