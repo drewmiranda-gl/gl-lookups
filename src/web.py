@@ -1,6 +1,4 @@
 # TODO
-# - rewrite caching
-#   - add functions
 # - add generic web query function
 
 from http.server import BaseHTTPRequestHandler, HTTPServer
