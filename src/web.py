@@ -891,7 +891,7 @@ if configFromArg['exit']:
 else:
     if __name__ == "__main__":
         
-        initDb(sDbFileName)
+        # initDb(sDbFileName)
         init_db_success = init_cache_db(mariadb_host, mariadb_port, mariadb_user, mariadb_pass)
         if init_db_success == False:
             logging.error("ERROR! Failed to initialize graylog_lookups MariaDB database.")
