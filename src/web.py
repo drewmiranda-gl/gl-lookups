@@ -7,7 +7,7 @@ from http.server import BaseHTTPRequestHandler, HTTPServer
 from unittest import result
 from urllib.parse import urlparse
 import urllib.parse
-# import time
+import time
 import json
 import argparse
 # import sys
@@ -18,6 +18,17 @@ from os.path import exists
 import requests
 import mariadb
 import mysql.connector
+import socketserver
+import http.server
+import colorlog
+from colorlog import ColoredFormatter
+
+# ----
+# mac notes - fix urllib warnings
+# pip uninstall urllib3
+# pip install 'urllib3<2.0'
+# ----
+
 # defaults
 parser = argparse.ArgumentParser(description="Just an example",
                                  formatter_class=argparse.ArgumentDefaultsHelpFormatter)
@@ -31,14 +42,28 @@ parser.add_argument('--debug', action=argparse.BooleanOptionalAction, default=Fa
 parser.add_argument('--ignore_sqlite', action=argparse.BooleanOptionalAction)
 parser.add_argument("--db", help="Sqlite DB File", default="searches.db")
 parser.add_argument('--log_response', action=argparse.BooleanOptionalAction, default=False)
+parser.add_argument('--cache-mariadb', action=argparse.BooleanOptionalAction, default=True)
+parser.add_argument('--debug-save-in-mariadb-cache', action=argparse.BooleanOptionalAction, default=True)
+parser.add_argument("--console-level", default="INFO")
+parser.add_argument("--log-level", default="INFO")
 
 args = parser.parse_args()
 configFromArg = vars(args)
+
+logger = logging.getLogger('PythonGraylogLookupsWeb')
+logger.setLevel(logging.DEBUG)
 
 hostName = "localhost"
 serverPort = int(configFromArg['port'])
 logFile = str(configFromArg['log'])
 sDbFileName = args.db
+
+mariadb_host = "127.0.0.1"
+mariadb_port = 3306
+mariadb_user = "root"
+mariadb_pass = ""
+MARIADB_FAIL_FATAL = True
+MARIADB_FAIL_NOTFATAL = False
 
 def getUnixTimeUtc():
     from datetime import datetime
@@ -93,7 +118,7 @@ def initDb(sArgDbFile):
         print("Creating database using " + str(sArgDbFile))
         dbExecute(sArgDbFile, create_table_statement)
 
-def mariadb_get_cur(mdb_hostname: str, mdb_port: int, mdb_username: str, mdb_password: str):
+def mariadb_get_cur(mdb_hostname: str, mdb_port: int, mdb_username: str, mdb_password: str, b_fail_fatal: bool):
     # Connect to MariaDB Platform
     try:
         conn = mariadb.connect(
@@ -103,35 +128,61 @@ def mariadb_get_cur(mdb_hostname: str, mdb_port: int, mdb_username: str, mdb_pas
             port=mdb_port,
             database="graylog_lookups"
         )
-
+        # Get Cursor
+        cur = conn.cursor()
+        return {
+            "cursor": cur,
+            "conn": conn
+        }
     except mariadb.Error as e:
-        print(f"Error connecting to MariaDB Platform: {e}")
+        logging.error(f"[[mariadb_get_cur]] Error connecting to MariaDB Platform: {e}")
         if "Unknown database" in str(e):
             return {
                 "error": "unknown database"
             }
-        else:
+        elif "(36)" in str(e):
+            if b_fail_fatal == True:
+                logging.critical("[[mariadb_get_cur]] cannot connect - exit(1)")
+                exit(1)
             return {
-                "error": str(e)
+                "error": "cannot connect"
             }
+        else:
+            if b_fail_fatal == True:
+                logging.critical("[[mariadb_get_cur]] error - exit(1)")
+                exit(1)
+            else:
+                logging.error("[[mariadb_get_cur]] ERROR! Fatal MariaDB error but continuing.")
+                return {
+                    "error": str(e)
+                }
 
-    # Get Cursor
-    cur = conn.cursor()
-    return {
-        "cursor": cur
-    }
 
 def create_cache_db(mdb_hostname: str, mdb_port: int, mdb_username: str, mdb_password: str):
-    mydb = mysql.connector.connect(
-        host=mdb_hostname,
-        port=mdb_port,
-        user=mdb_username,
-        password=mdb_password
-    )
+    # mydb = mysql.connector.connect(
+    #     host=mdb_hostname,
+    #     port=mdb_port,
+    #     user=mdb_username,
+    #     password=mdb_password
+    # )
+    # mycursor = mydb.cursor()
+    # mycursor.execute("CREATE DATABASE graylog_lookups")
 
-    mycursor = mydb.cursor()
-
-    mycursor.execute("show tables")
+    try:
+        conn = mariadb.connect(
+            user=mdb_username,
+            password=mdb_password,
+            host=mdb_hostname,
+            port=mdb_port
+        )
+    except mariadb.Error as e:
+        logging.error(f"[[create_cache_db]] Error connecting to MariaDB Platform: {e}")
+    
+    try:
+        cur = conn.cursor()
+        cur.execute("CREATE DATABASE graylog_lookups")
+    except mariadb.Error as e:
+        logging.error(f"[[create_cache_db]] Error connecting to MariaDB Platform: {e}")
 
 def get_table_create_sql(tablename: str):
     sql = ""
@@ -144,36 +195,59 @@ def get_table_create_sql(tablename: str):
         # ttl           INT
         # date_created  INT
 
-        sql = ('"CREATE TABLE rdns (' + '\n' +
+        sql = ('CREATE TABLE rdns (' + '\n' +
                     'uid MEDIUMINT NOT NULL AUTO_INCREMENT,' + '\n' +
                     'ip VARCHAR(15) NOT NULL,' + '\n' +
                     'name TEXT,' + '\n' +
                     'has_lookup TINYINT(1) DEFAULT 0 NOT NULL,' + '\n' +
                     'ttl VARCHAR(15) NULL,' + '\n' +
                     'date_created VARCHAR(15) NOT NULL,' + '\n' +
-                    'PRIMARY KEY (id)' + '\n' +
-                ');"')
+                    'PRIMARY KEY (uid)' + '\n' +
+                ');')
     
     return sql
 
-def create_cache_table(mdb_hostname: str, mdb_port: int, mdb_username: str, mdb_password: str, tablename: str):
-    # rs_cur = mariadb_get_cur(mdb_hostname, mdb_port, mdb_username, mdb_password)
-    # rs_cur["cursor"].execute("show tables")
+def does_table_exist(cur, tablename: str):
+    str_sql = "SELECT * FROM " + str(tablename)
+
+    try:
+        cur.execute(str_sql)
+    except mariadb.Error as e:
+        return False
+    
+    return True
+
+def create_cache_table(cur, tablename: str):
+    # Obtain SQL
     table_create_sql = get_table_create_sql(tablename)
-    print(table_create_sql)
+    
+    # Execute SQL
+    cur.execute(table_create_sql)
+    
+    # Verify Table was successfully created
+    b_table_exists = does_table_exist(cur, tablename)
+    if b_table_exists == False:
+        logging.critical(f"[[create_cache_table]] ERROR: Failed to create cache table: " + str(tablename))
+        exit(1)
 
 def init_cache_db(hostname: str, port: int, username: str, password: str):
     # test if DB exists
-    rs_cur = mariadb_get_cur(hostname, port, username, password)
+    rs_cur = mariadb_get_cur(hostname, port, username, password, MARIADB_FAIL_NOTFATAL)
+    if not rs_cur:
+        return False
+
     if "error" in rs_cur:
         if rs_cur['error'] == "unknown database":
-            print("database missing let us create it!")
+            logging.info("[[init_cache_db]] database missing let us create it!")
+
             # create missing database
             create_cache_db(hostname, port, username, password)
             # retest
-            rs_cur = mariadb_get_cur(hostname, port, username, password)
+            rs_cur = mariadb_get_cur(hostname, port, username, password, MARIADB_FAIL_NOTFATAL)
             if "error" in rs_cur:
                 return False
+        elif rs_cur['error'] == "cannot connect":
+            return False
         
     # init tables?
     l_cache_tables = []
@@ -192,12 +266,144 @@ def init_cache_db(hostname: str, port: int, username: str, password: str):
 
     for table_name in l_cache_tables:
         if not table_name in l_existing_tables:
-            print("Table does not exist, we need to create it: " + str(table_name))
-            create_cache_table(hostname, port, username, password, str(table_name))
+            logging.info("[[init_cache_db]] Table does not exist, we need to create it: " + str(table_name))
+            create_cache_table(rs_cur["cursor"], str(table_name))
 
+    conn = rs_cur["conn"]
+    conn.close()
 
     return True
 
+def mariadb_type_helper(input):
+    # return "'" + str(input) + "'"
+
+    if type(input) == int:
+        return str(input)
+    else:
+        return "'" + str(input) + "'"
+
+def convert_dict_to_sql_insert(table_name: str, dict_to_use_to_build: dict):
+    str_sql = "INSERT INTO " + str(table_name) + " ("
+    
+    i_fields = 0
+    for item in dict_to_use_to_build:
+        # print(item + ": " + str(dict_to_use_to_build[item]))
+        if i_fields > 0:
+            str_sql = str_sql + ", "
+        str_sql = str_sql + item
+        i_fields = i_fields +1
+    
+    str_sql = str_sql + ") "
+    str_sql = str_sql + " VALUES ("
+
+    i_fields = 0
+    for item in dict_to_use_to_build:
+        # print(item + ": " + str(dict_to_use_to_build[item]))
+        if i_fields > 0:
+            str_sql = str_sql + ", "
+        
+        str_sql = str_sql + str(mariadb_type_helper(dict_to_use_to_build[item]))
+        i_fields = i_fields +1
+
+    str_sql = str_sql + ")"
+    
+    return str_sql
+
+def save_lookup_in_cache(lookup_table: str, dict_to_cache: dict):
+    b_error = True
+    str_sql = convert_dict_to_sql_insert(lookup_table, dict_to_cache)
+    rs_cur = mariadb_get_cur(mariadb_host, mariadb_port, mariadb_user, mariadb_pass, MARIADB_FAIL_NOTFATAL)
+    if rs_cur:
+        if "cursor" in rs_cur and "conn" in rs_cur:
+            cur = rs_cur["cursor"]
+            conn = rs_cur["conn"]
+            b_error = False
+
+    if b_error == True:
+        return False
+
+    try:
+        # print(str_sql)
+        cur.execute(str_sql)
+        # print(f"{cur.rowcount} details inserted")
+        conn.commit()
+        conn.close()
+        logging.debug("[[save_lookup_in_cache]] cached: [" + str(lookup_table) + "] " + str(json.dumps(dict_to_cache)))
+    except mariadb.Error as e:
+        logging.error(f"[[save_lookup_in_cache]] Error: {e}")
+
+def delete_lookup_in_cache(lookup_table: str, lookup_key: str):
+    b_error = True
+    str_sql = "DELETE FROM " + str(lookup_table) + " WHERE ip = '" + str(lookup_key) + "'"
+    rs_cur = mariadb_get_cur(mariadb_host, mariadb_port, mariadb_user, mariadb_pass, MARIADB_FAIL_NOTFATAL)
+
+    if rs_cur:
+        if "cursor" in rs_cur and "conn" in rs_cur:
+            cur = rs_cur["cursor"]
+            conn = rs_cur["conn"]
+            b_error = False
+
+    if b_error == True:
+        return False
+
+    try:
+        # print(str_sql)
+        cur.execute(str_sql)
+        # print(f"{cur.rowcount} details inserted")
+        conn.commit()
+        conn.close()
+        logging.debug("[[delete_lookup_in_cache]] deleted: [" + str(lookup_table) + "] " + str(lookup_key))
+    except mariadb.Error as e:
+        logging.error(f"[[delete_lookup_in_cache]] Error: {e}")
+
+def list_to_numbers(input_list: list):
+    d = {}
+    i = 0
+    for item in input_list:
+        d[item] = i
+        i = i + 1
+    return d
+
+def cache_result_format(lookup_table: str, row):
+    dict_field_pos = {}
+    dict_field_pos["rdns"] = ["uid", "ip", "name", "has_lookup", "ttl", "date_created"]
+    
+    lookup_list_field_pos = list_to_numbers(dict_field_pos[lookup_table])
+
+    if lookup_table == "rdns":
+        if row:
+            return {
+                "ip": row[lookup_list_field_pos["ip"]],
+                "name": row[lookup_list_field_pos["name"]],
+                "has_lookup": row[lookup_list_field_pos["has_lookup"]],
+                "ttl": row[lookup_list_field_pos["ttl"]],
+                "date_created": row[lookup_list_field_pos["date_created"]]
+            }
+    
+    return {}
+
+def get_lookup_from_cache(lookup_table: str, lookup_key: str):
+    b_error = True
+    str_sql = "SELECT * FROM " + str(lookup_table) + " WHERE ip = '" + str(lookup_key) + "' ORDER BY date_created DESC LIMIT 1"
+    rs_cur = mariadb_get_cur(mariadb_host, mariadb_port, mariadb_user, mariadb_pass, MARIADB_FAIL_NOTFATAL)
+
+    if rs_cur:
+        if "cursor" in rs_cur and "conn" in rs_cur:
+            cur = rs_cur["cursor"]
+            conn = rs_cur["conn"]
+            b_error = False
+
+    if b_error == True:
+        return {}
+
+    try:
+        cur.execute(str_sql)
+        row = cur.fetchone()
+        final_return = cache_result_format(lookup_table, row)
+        return final_return
+
+    except mariadb.Error as e:
+        logging.error(f"[[get_lookup_from_cache]] Error: {e}")
 
 def getDbRow(sArgDbFile, strSql):
     if exists(sArgDbFile):
@@ -299,46 +505,40 @@ def lookupRDns(argQuery):
     #       192.168.0.0/16 (192.168.0.0 - 192.168.255.255)
     #   multicast/broadcast
 
-    # Check sql lite database
-    if configFromArg['ignore_sqlite'] == True:
-        dbRs = []
-    else:
-        dbRs = getDbRow(sDbFileName, "SELECT * FROM rdns WHERE ip = '" + str(argQuery) + "'")
-        
-    # if IP is found
-    if len(dbRs) > 0:
-        if configFromArg['verbose'] == True:
-            print(json.dumps(dbRs))
+    if args.cache_mariadb == True:
+        cache_record = get_lookup_from_cache("rdns", str(argQuery))
 
+    # logging.debug("cache_record: " + str(cache_record))
+
+    if cache_record and 'has_lookup' in cache_record:
+        str_cached_result_returned = {
+            "value": cache_record['name'],
+            "lookup": argQuery,
+            "meta": "Returned via mariadb cache",
+            "cached": 1
+        }
+
+        # logging.debug("Cache record returned: " + str(cache_record))
         # check for TTL expiration
         unix_time_now_utc = getUnixTimeUtc()
-        ttl = dbRs['ttl']
-        date_created = dbRs['date_created']
-        if date_created + ttl < unix_time_now_utc:
-            print("TTL has expired!")
-            # delete record
-            deleteIp(sDbFileName, argQuery)
+        if 'ttl' in cache_record and 'date_created' in cache_record:
+            ttl = cache_record['ttl']
+            date_created = cache_record['date_created']
+            int_ttl_compare = int(ttl) + int(date_created)
+            # logging.debug("ttl: " + str(ttl) + ", date_created: " + str(date_created) + "\n" + "Is " + str(int_ttl_compare) + " < " + str(unix_time_now_utc))
+            if int(int_ttl_compare) < int(unix_time_now_utc):
+                logging.debug("Cache TTL Expired, deleting cached record: rdns,")
+                delete_lookup_in_cache("rdns", str(argQuery))
+            else:
+                return str_cached_result_returned
         else:
-            if dbRs['has_lookup'] == False:
-                if configFromArg['verbose'] == True:
-                    print("Entry found in SQLite rDNS table, but no hostname saved. Returning Empty.")
-                # return empty if no lookup is present, this will prevent this IP from
-                #   causing a rDNS query timeout
+            if 'has_lookup' in cache_record and int(cache_record['has_lookup']) == 0:
+                logging.info("Cache record has no hostname saved: " + str(argQuery))
                 return {"value": ""}
             else:
-                if configFromArg['verbose'] == True:
-                    print("Entry found in SQLite rDNS table. Returning cached hostname.")
-                # if a lookup exists in local sqlite, return that
-                return {
-                    "value": dbRs['name'],
-                    "lookup": argQuery,
-                    "meta": "Returned via sqlite cache",
-                    "cached": 1
-                }
+                return str_cached_result_returned
     else:
-        if configFromArg['verbose'] == True:
-            print("NO Entry found in SQLite rDNS table.")
-
+        logging.debug("NO Cache record found for: " + str(argQuery))
 
     lIgnoreThese = ["239.255.255.250", "255.255.255.255"]
 
@@ -365,6 +565,19 @@ def lookupRDns(argQuery):
     else:
         result = get_domain_name(argQuery)
 
+        dict_to_cache = {
+            "ip": str(argQuery),
+            "name": str(result),
+            "ttl": 604800,
+            "date_created": getUnixTimeUtc()
+        }
+        if len(result) > 0:
+            has_lookup = 1
+        else:
+            has_lookup = 0
+        dict_to_cache["has_lookup"] = has_lookup
+        logging.debug("args.debug_save_in_mariadb_cache = " + str(args.debug_save_in_mariadb_cache))
+
         if "exception" in result:
             # if configFromArg['verbose'] == True:
             #     print("exeption is in result")
@@ -373,6 +586,8 @@ def lookupRDns(argQuery):
             return result
         else:
             addTimeoutIp(sDbFileName, argQuery, result)
+            if args.debug_save_in_mariadb_cache == True:
+                save_lookup_in_cache("rdns", dict_to_cache)
 
         return {
             "value": result,
@@ -382,8 +597,11 @@ def lookupRDns(argQuery):
 
 def lookupDns(argQuery):
     result = get_ipv4_by_hostname(argQuery)
-    return result
-    # return result
+    return {
+        "value": result,
+        "meta": "returned from DNS query",
+        "cached": 0
+    }
 
 def anomUrl(argQuery):
     oArgs = parseArgs(argQuery)
@@ -535,30 +753,77 @@ def doLookups(argQuery):
     elif sLookup == "vt_hash":
         return virus_total_hash(oArgs['key'])
 
+def log_level_from_string(log_level: str):
+    if log_level.upper() == "DEBUG":
+        return logging.DEBUG
+    elif log_level.upper() == "INFO":
+        return logging.INFO
+    elif log_level.upper() == "WARN":
+        return logging.WARN
+    elif log_level.upper() == "ERROR":
+        return logging.ERROR
+    elif log_level.upper() == "CRITICAL":
+        return logging.CRITICAL
+
+    return logging.INFO
+
+# logging.basicConfig(
+#         filename=logFile,
+#         encoding='utf-8',
+#         level=logging.DEBUG,
+#         format='%(asctime)s %(levelname)-8s %(message)s',
+#         datefmt='%Y-%m-%d %H:%M:%S'
+#     )
+
+
+
+
+# handlers
+logging_file_handler = logging.FileHandler(logFile)
+logging_file_handler.setLevel(log_level_from_string(str(args.log_level)))
+formatter = logging.Formatter('%(asctime)s.%(msecs)03d %(levelname)-8s (' + str(hostName) + ':' + str(serverPort) + ') %(message)s', '%Y-%m-%d %H:%M:%S')
+logging_file_handler.setFormatter(formatter)
+logger.addHandler(logging_file_handler)
+
+logging_console_handler = colorlog.StreamHandler()
+logging_console_handler.setLevel(log_level_from_string(str(args.console_level)))
+formatter = ColoredFormatter(
+        '%(asctime)s.%(msecs)03d %(log_color)s%(levelname)-8s%(reset)s (' + str(hostName) + ':' + str(serverPort) + ') %(message)s',
+        datefmt='%Y-%m-%d %H:%M:%S',
+        reset=True,
+        log_colors={
+            "DEBUG": "cyan",
+            "INFO": "green",
+            "WARNING": "yellow",
+            "ERROR": "red",
+            "CRITICAL": "red",
+        },
+    )
+logging_console_handler.setFormatter(formatter)
+logger.addHandler(logging_console_handler)
+
+# alias so we don't break existing logging
+logging = logger
+
 class MyServer(BaseHTTPRequestHandler):
     def setup(self):
         BaseHTTPRequestHandler.setup(self)
         self.request.settimeout(5)
 
     def myLog( self, fmt, request, code, other ):
-        logging.basicConfig(filename=logFile, encoding='utf-8', level=logging.DEBUG)
         # syslog( LOG_INFO, '%s %s' % ( code, request) )
-        logging.info('%s %s' % ( code, request))
+        logging.info('[[HTTP]] %s %s' % ( code, request))
 
     def do_GET(self):
         http_write_output = ""
         self.log_message = self.myLog
 
-        
-        
-        
+        # time.sleep(5)
         
         # self.wfile.write(bytes("%s" % self.path, "utf-8"))
-        # print(self.path)
         o = urlparse(self.path)
         if o.path == "/":
             dictRs = {}
-            # print("path is / lets do cool stuff")
 
             # todo
             # 
@@ -570,6 +835,7 @@ class MyServer(BaseHTTPRequestHandler):
             #       goal is to improve throughput of DNS lookups
 
             try:
+                # logging.debug("Lookup Query: " + str(o.query))
                 rs = doLookups(o.query)
 
                 if "exception" in rs:
@@ -615,21 +881,30 @@ class MyServer(BaseHTTPRequestHandler):
 
         self.send_header("Content-type", "application/json")
         self.end_headers()
+        if http_write_output:
+            logging.debug("Lookup Answer: " + str(http_write_output))
         self.wfile.write(bytes(http_write_output, "utf-8"))
+
+class ThreadedHTTPServer(socketserver.ThreadingMixIn, http.server.HTTPServer):
+    daemon_threads = True
 
 if configFromArg['exit']:
     rs = doLookups("lookup=" + configFromArg['lookup'] + "&key=" + configFromArg['key'])
     print(rs)
 else:
     if __name__ == "__main__":
+        
         initDb(sDbFileName)
-        init_db_success = init_cache_db("127.0.0.1", 3306, "root", "")
-        if init_cache_db == False:
-            print("ERROR! Failed to initialize graylog_lookups MariaDB database.")
-            exit(1)
-        exit()
-        webServer = HTTPServer((hostName, serverPort), MyServer)
-        print("Server started http://%s:%s" % (hostName, serverPort))
+        init_db_success = init_cache_db(mariadb_host, mariadb_port, mariadb_user, mariadb_pass)
+        if init_db_success == False:
+            logging.error("ERROR! Failed to initialize graylog_lookups MariaDB database.")
+            if args.cache_mariadb == True:
+                logging.critical("--cache-mariadb=true , cannot continue.")
+                exit(1)
+
+        # webServer = HTTPServer((hostName, serverPort), MyServer)
+        webServer = ThreadedHTTPServer((hostName, serverPort), MyServer)
+        logging.info("Server started http://%s:%s" % (hostName, serverPort))
 
         try:
             webServer.serve_forever()
@@ -637,4 +912,4 @@ else:
             pass
 
         webServer.server_close()
-        print("Server stopped.")
+        logging.info("Server stopped.")
