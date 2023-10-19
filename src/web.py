@@ -15,7 +15,7 @@ import sqlite3
 from os.path import exists
 import requests
 import mariadb
-import mysql.connector
+# import mysql.connector
 import socketserver
 import http.server
 import colorlog
