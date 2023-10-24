@@ -5,7 +5,7 @@ services:
   database:
     image: mariadb:latest
     container_name: mariadb
-    # restart: unless-stopped
+    restart: unless-stopped
     environment:
       MARIADB_ALLOW_EMPTY_ROOT_PASSWORD: "true"
     ports:
