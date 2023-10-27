@@ -199,8 +199,23 @@ def get_table_create_sql(tablename: str):
                     'ip VARCHAR(15) NOT NULL,' + '\n' +
                     'name TEXT,' + '\n' +
                     'has_lookup TINYINT(1) DEFAULT 0 NOT NULL,' + '\n' +
+                    # 'lookup_source VARCHAR(255) DEFAULT \'\' NOT NULL,' + '\n' +
                     'ttl VARCHAR(15) NULL,' + '\n' +
                     'date_created VARCHAR(15) NOT NULL,' + '\n' +
+                    'PRIMARY KEY (uid)' + '\n' +
+                ');')
+    elif tablename == "migrations":
+
+        # ip            TEXT
+        # name          TEXT
+        # has_lookup    INT (0/1)
+        # ttl           INT
+        # date_created  INT
+
+        sql = ('CREATE TABLE migrations (' + '\n' +
+                    'uid MEDIUMINT NOT NULL AUTO_INCREMENT,' + '\n' +
+                    'mig_name VARCHAR(255) NULL,' + '\n' +
+                    'data TEXT,' + '\n' +
                     'PRIMARY KEY (uid)' + '\n' +
                 ');')
     
@@ -229,6 +244,33 @@ def create_cache_table(cur, tablename: str):
         logging.critical(f"[[create_cache_table]] ERROR: Failed to create cache table: " + str(tablename))
         exit(1)
 
+def run_init_db_mig(conn, cur, migration_name: str):
+    logging.debug("[[run_init_db_mig]] running migration: " + str(migration_name))
+
+    if migration_name == "rdns_column_add_lookup_source":
+        sql = ('ALTER TABLE rdns' + '\n' +
+                    'ADD COLUMN lookup_source VARCHAR(255) DEFAULT \'\' NOT NULL AFTER has_lookup' + '\n' +
+                ';')
+    else:
+        return False
+    
+    try:
+        cur.execute(sql)
+        conn.commit()
+    except mariadb.Error as e:
+        logging.error(f"[[run_init_db_mig]] Error: {e}")
+        return False
+    
+    save_mig_state = "INSERT INTO migrations (mig_name) VALUES ('" + str(migration_name) + "')"
+    try:
+        cur.execute(save_mig_state)
+        conn.commit()
+    except mariadb.Error as e:
+        logging.error(f"[[run_init_db_mig]] Error: {e}")
+        return False
+    
+    return True
+
 def init_cache_db(hostname: str, port: int, username: str, password: str):
     # test if DB exists
     rs_cur = mariadb_get_cur(hostname, port, username, password, MARIADB_FAIL_NOTFATAL)
@@ -251,6 +293,7 @@ def init_cache_db(hostname: str, port: int, username: str, password: str):
     # init tables?
     l_cache_tables = []
     l_cache_tables.append("rdns")
+    l_cache_tables.append("migrations")
 
     l_existing_tables = []
 
@@ -262,13 +305,29 @@ def init_cache_db(hostname: str, port: int, username: str, password: str):
             if len(table_name):
                 # print(table_name[0])
                 l_existing_tables.append(str(table_name[0]))
+    conn = rs_cur["conn"]
 
     for table_name in l_cache_tables:
         if not table_name in l_existing_tables:
             logging.info("[[init_cache_db]] Table does not exist, we need to create it: " + str(table_name))
             create_cache_table(rs_cur["cursor"], str(table_name))
 
-    conn = rs_cur["conn"]
+    # migrations
+    l_migrations = []
+    l_migrations.append("rdns_column_add_lookup_source")
+
+    l_existing_mig = []
+    
+    rs_cur["cursor"].execute("SELECT mig_name FROM migrations")
+    if rs_cur["cursor"]:
+        for existing_mig in rs_cur["cursor"]:
+            l_existing_mig.append(str(existing_mig[0]))
+    
+    for mig_to_verify in l_migrations:
+        if not mig_to_verify in l_existing_mig:
+            logging.warning("[[init_cache_db]] migration '" + str(mig_to_verify) + " has not run.")
+            run_init_db_mig(conn, rs_cur["cursor"], mig_to_verify)
+
     conn.close()
 
     return True
@@ -365,7 +424,7 @@ def list_to_numbers(input_list: list):
 
 def cache_result_format(lookup_table: str, row):
     dict_field_pos = {}
-    dict_field_pos["rdns"] = ["uid", "ip", "name", "has_lookup", "ttl", "date_created"]
+    dict_field_pos["rdns"] = ["uid", "ip", "name", "has_lookup", "lookup_source", "ttl", "date_created"]
     
     lookup_list_field_pos = list_to_numbers(dict_field_pos[lookup_table])
 
@@ -568,6 +627,7 @@ def lookupRDns(argQuery):
             "ip": str(argQuery),
             "name": str(result),
             "ttl": 604800,
+            "lookup_source": "dns",
             "date_created": getUnixTimeUtc()
         }
         if len(result) > 0:
