@@ -919,7 +919,7 @@ class MyServer(BaseHTTPRequestHandler):
                             logging.info(log_dict)
                     if "cached" in rs:
                         if rs['cached'] == 1:
-                            logging.info("Cached=1, " + rs['meta'] + ", " + rs['lookup'] + "=" + rs['value'])
+                            logging.info("[[do_GET]] Cached=1, " + rs['meta'] + ", " + rs['lookup'] + "=" + rs['value'])
                     dictRs['value'] = rs['value']
                 
                 y = json.dumps(dictRs)
