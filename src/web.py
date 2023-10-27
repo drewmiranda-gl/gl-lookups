@@ -553,6 +553,17 @@ def get_domain_name(ip_address):
 
     return result
 
+def validate_ip_address(ip_string):
+    try:
+        ip_object = ipaddress.ip_address(ip_string)
+        # logging.debug("[[validate_ip_address]] The IP address '{ip_object}' is valid.")
+        return True
+    except ValueError:
+        return False
+        # logging.debug("[[validate_ip_address]] The IP address '{ip_string}' is not valid")
+    
+    return False
+
 def lookupRDns(argQuery):
     # log to filter out/ignore
     #   255.255.255.255
@@ -783,6 +794,69 @@ def virus_total_hash(arg_query):
         "lookup": str(arg_query)
     }
 
+def convert_comma_string_to_list(comma_list: str):
+    new_list = []
+    for item in comma_list.split(","):
+        x = item.replace("[", "")
+        x = x.replace("]", "")
+        x = x.strip()
+        new_list.append(x)
+    return new_list
+
+def cache_dns_answer(arg_query):
+    o_js = {}
+    try:
+        str_url_decode = urllib.parse.unquote(arg_query)
+        o_js = json.loads(str_url_decode) # dict
+    except Exception as e:
+        excpInfo = "" + str(e) + "; Query: " + str(arg_query)
+        dicRet = {}
+        dicRet["err"] = excpInfo
+        logging.error(excpInfo)
+
+    if len(o_js) < 1:
+        logging.error("[[cache_dns_answer]] JSON could not be parsed")
+        return {"value":""}
+    
+    if not "query" in o_js:
+        logging.error("[[cache_dns_answer]] missing key 'query' in parsed JSON")
+        return {"value":""}
+    
+    if not "answer" in o_js:
+        logging.error("[[cache_dns_answer]] missing key 'answer' in parsed JSON")
+        return {"value":""}
+
+    s_query = o_js['query']
+    l_answer = o_js['answer']
+
+    if type(l_answer) == str:
+        logging.warn("incorrect type for answer!")
+        l_answer = convert_comma_string_to_list(l_answer)
+
+    logging.debug("s_query: " + str(s_query) + " (" + str(type(s_query)) + ")")
+    logging.debug("l_answer: " + str(l_answer) + " (" + str(type(l_answer)) + ")")
+
+    if type(l_answer) == list:
+        for one_answer in l_answer:
+            logging.debug("Answer: " + str(one_answer))
+            b_is_ip = validate_ip_address(str(one_answer))
+            logging.debug("     b_is_ip: " + str(b_is_ip))
+            if b_is_ip == True:
+                dict_to_cache = {
+                    "ip": str(one_answer),
+                    "name": str(s_query),
+                    "has_lookup": 1,
+                    "lookup_source": "zeek",
+                    "ttl": 604800,
+                    "date_created": getUnixTimeUtc()
+                }
+                logging.debug(dict_to_cache)
+                delete_lookup_in_cache("rdns", str(one_answer))
+                save_lookup_in_cache("rdns", dict_to_cache)
+                logging.info("[[cache_dns_answer]] caching query and answer from zeek DNS logging. " + str(one_answer) + "=" + str(s_query))
+
+    return {"value":""}
+
 def parseArgs(argQuery):
     dictArgs = {}
     sKey = ""
@@ -810,6 +884,8 @@ def doLookups(argQuery):
         return winevt4663mask(oArgs['key'])
     elif sLookup == "vt_hash":
         return virus_total_hash(oArgs['key'])
+    elif sLookup == "cache_dns_answer":
+        return cache_dns_answer(oArgs['key'])
 
 def log_level_from_string(log_level: str):
     if log_level.upper() == "DEBUG":
