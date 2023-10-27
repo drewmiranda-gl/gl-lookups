@@ -30,6 +30,7 @@ from colorlog import ColoredFormatter
 # defaults
 parser = argparse.ArgumentParser(description="Just an example",
                                  formatter_class=argparse.ArgumentDefaultsHelpFormatter)
+parser.add_argument("--hostname", help="Host or IP to bind to", default="localhost")
 parser.add_argument("--port", help="Port to bind to (TCP)", default="8080")
 parser.add_argument("--log", help="Output Log File", default="web.log")
 parser.add_argument('--exit', action=argparse.BooleanOptionalAction)
@@ -51,7 +52,7 @@ configFromArg = vars(args)
 logger = logging.getLogger('PythonGraylogLookupsWeb')
 logger.setLevel(logging.DEBUG)
 
-hostName = "localhost"
+hostName = str(configFromArg['hostname'])
 serverPort = int(configFromArg['port'])
 logFile = str(configFromArg['log'])
 sDbFileName = args.db
