@@ -458,6 +458,7 @@ def get_lookup_from_cache(lookup_table: str, lookup_key: str):
         cur.execute(str_sql)
         row = cur.fetchone()
         final_return = cache_result_format(lookup_table, row)
+        conn.close()
         return final_return
 
     except mariadb.Error as e:
