@@ -21,4 +21,4 @@ services:
       driver: "gelf"
       options:
         gelf-address: "udp://127.0.0.1:12204"
-        tag: "docker_mariadbudp://localhost:12201"
+        tag: "docker_mariadb"
