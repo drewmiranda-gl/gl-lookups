@@ -16,6 +16,7 @@ services:
       - ./storage/datadir:/var/lib/mysql
     command: [
       '--wait_timeout=3600',
+      '--log-warnings=9',
     ]
     logging:
       driver: "gelf"
