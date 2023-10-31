@@ -2,6 +2,8 @@ version: '3.8'
 
 services:
 
+  # https://mariadb.com/kb/en/mariadb-server-docker-official-image-environment-variables/
+  # https://github.com/MariaDB/mariadb-docker/blob/master/examples/compose-replication.yml
   database:
     image: mariadb:latest
     container_name: mariadb
@@ -12,3 +14,6 @@ services:
       - 3306:3306
     volumes:
       - ./storage/datadir:/var/lib/mysql
+    command: [
+      '--wait_timeout=7200',
+    ]
