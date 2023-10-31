@@ -388,7 +388,7 @@ def save_lookup_in_cache(lookup_table: str, dict_to_cache: dict):
         conn.close()
         logging.debug("[[save_lookup_in_cache]] cached: [" + str(lookup_table) + "] " + str(json.dumps(dict_to_cache)))
     except mariadb.Error as e:
-        logging.error(f"[[save_lookup_in_cache]] Error: {e}")
+        conn.close()
 
 def delete_lookup_in_cache(lookup_table: str, lookup_key: str):
     b_error = True
@@ -412,6 +412,7 @@ def delete_lookup_in_cache(lookup_table: str, lookup_key: str):
         conn.close()
         logging.debug("[[delete_lookup_in_cache]] deleted: [" + str(lookup_table) + "] " + str(lookup_key))
     except mariadb.Error as e:
+        conn.close()
         logging.error(f"[[delete_lookup_in_cache]] Error: {e}")
 
 def list_to_numbers(input_list: list):
@@ -462,6 +463,7 @@ def get_lookup_from_cache(lookup_table: str, lookup_key: str):
         return final_return
 
     except mariadb.Error as e:
+        conn.close()
         logging.error(f"[[get_lookup_from_cache]] Error: {e}")
 
 def getDbRow(sArgDbFile, strSql):
