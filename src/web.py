@@ -660,7 +660,9 @@ def lookupRDns(argQuery):
         else:
             addTimeoutIp(sDbFileName, argQuery, result)
             if args.debug_save_in_mariadb_cache == True:
-                save_lookup_in_cache("rdns", dict_to_cache)
+                b_is_ip = validate_ip_address(str(argQuery))
+                if b_is_ip == True:
+                    save_lookup_in_cache("rdns", dict_to_cache)
 
         return {
             "value": result,
