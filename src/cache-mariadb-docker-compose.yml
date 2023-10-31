@@ -15,5 +15,10 @@ services:
     volumes:
       - ./storage/datadir:/var/lib/mysql
     command: [
-      '--wait_timeout=7200',
+      '--wait_timeout=3600',
     ]
+    logging:
+      driver: "gelf"
+      options:
+        gelf-address: "udp://127.0.0.1:12204"
+        tag: "docker_mariadb"
