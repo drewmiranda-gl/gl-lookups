@@ -11,6 +11,8 @@ WorkingDirectory=/opt/graylog/lookup-service
 Type=simple
 Restart=always
 ExecStart=/opt/graylog/lookup-service/service-wrapper.sh 8082 /opt/graylog/lookup-service/web2.log
+ExecStartPre=/bin/sleep 60
+RestartSec=5s
 
 [Install]
 WantedBy=multi-user.target
