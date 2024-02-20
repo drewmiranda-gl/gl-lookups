@@ -252,6 +252,10 @@ def run_init_db_mig(conn, cur, migration_name: str):
         sql = ('ALTER TABLE rdns' + '\n' +
                     'ADD COLUMN lookup_source VARCHAR(255) DEFAULT \'\' NOT NULL AFTER has_lookup' + '\n' +
                 ';')
+    elif migration_name == "rdns_column_alter_uid_int":
+        sql = ('ALTER TABLE rdns' + '\n' +
+                    'MODIFY COLUMN uid INT auto_increment NOT NULL' + '\n' +
+                ';')
     else:
         return False
     
@@ -316,6 +320,7 @@ def init_cache_db(hostname: str, port: int, username: str, password: str):
     # migrations
     l_migrations = []
     l_migrations.append("rdns_column_add_lookup_source")
+    l_migrations.append("rdns_column_alter_uid_int")
 
     l_existing_mig = []
     
