@@ -20,6 +20,7 @@ import socketserver
 import http.server
 import colorlog
 from colorlog import ColoredFormatter
+from threading import Thread
 
 # ----
 # mac notes - fix urllib warnings
@@ -1023,10 +1024,13 @@ class MyServer(BaseHTTPRequestHandler):
         self.end_headers()
         if http_write_output:
             logging.debug("Lookup Answer: " + str(http_write_output))
-        self.wfile.write(bytes(http_write_output, "utf-8"))
 
-class ThreadedHTTPServer(socketserver.ThreadingMixIn, http.server.HTTPServer):
+        self.wfile.write(bytes(http_write_output, "utf-8"))
+        return
+       
+class ThreadingHTTPServer(socketserver.ThreadingMixIn, http.server.HTTPServer):
     daemon_threads = True
+    pass
 
 if configFromArg['exit']:
     rs = doLookups("lookup=" + configFromArg['lookup'] + "&key=" + configFromArg['key'])
@@ -1043,7 +1047,7 @@ else:
                 exit(1)
 
         # webServer = HTTPServer((hostName, serverPort), MyServer)
-        webServer = ThreadedHTTPServer((hostName, serverPort), MyServer)
+        webServer = ThreadingHTTPServer((hostName, serverPort), MyServer)
         logging.info("Server started http://%s:%s" % (hostName, serverPort))
 
         try:
