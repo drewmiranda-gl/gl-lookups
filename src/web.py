@@ -584,6 +584,7 @@ def lookupRDns(argQuery):
     #       192.168.0.0/16 (192.168.0.0 - 192.168.255.255)
     #   multicast/broadcast
 
+    cache_record = {}
     if args.cache_mariadb == True:
         cache_record = get_lookup_from_cache("rdns", str(argQuery))
 
