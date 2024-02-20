@@ -574,6 +574,23 @@ def validate_ip_address(ip_string):
     
     return False
 
+def validate_ip_addr_ver(ip_string: str, ip_ver: int):
+    if not validate_ip_address(ip_string):
+        return False
+
+    if ip_ver == 4:
+        if ":" in ip_string:
+            return False
+        else:
+            return True
+    elif ip_ver == 6:
+        if ":" in ip_string:
+            return True
+        else:
+            return False
+    
+    return False
+
 def lookupRDns(argQuery):
     # log to filter out/ignore
     #   255.255.255.255
@@ -672,7 +689,7 @@ def lookupRDns(argQuery):
         else:
             addTimeoutIp(sDbFileName, argQuery, result)
             if args.debug_save_in_mariadb_cache == True:
-                b_is_ip = validate_ip_address(str(argQuery))
+                b_is_ip = validate_ip_addr_ver(str(argQuery), 4)
                 if b_is_ip == True:
                     save_lookup_in_cache("rdns", dict_to_cache)
 
@@ -857,7 +874,8 @@ def cache_dns_answer(arg_query):
     if type(l_answer) == list:
         for one_answer in l_answer:
             logging.debug("Answer: " + str(one_answer))
-            b_is_ip = validate_ip_address(str(one_answer))
+            b_is_ip = validate_ip_addr_ver(str(one_answer), 4)
+            
             logging.debug("     b_is_ip: " + str(b_is_ip))
             if b_is_ip == True:
                 dict_to_cache = {
