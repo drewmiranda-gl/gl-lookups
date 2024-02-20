@@ -626,9 +626,14 @@ def lookupRDns(argQuery):
 
     if str(argQuery) in lIgnoreThese:
         bGiveResult = False
+    
+    # ignore lookups for local networks 192.168.0.0 - 192.168.255.255
     elif ipaddress.ip_address(str(argQuery)) in ipaddress.ip_network('192.168.0.0/16'):
-        if not ipaddress.ip_address(str(argQuery)) in ipaddress.ip_network('192.168.0.0/24'):
-            bGiveResult = False
+        # allow lookups for 192.168.100.1
+        if not str(argQuery) =="192.168.100.1":
+            # allow lookups for 192.168.0.0 - 192.168.0.255
+            if not ipaddress.ip_address(str(argQuery)) in ipaddress.ip_network('192.168.0.0/24'):
+                bGiveResult = False
     elif ipaddress.ip_address(str(argQuery)) in ipaddress.ip_network('10.0.0.0/8'):
         bGiveResult = False
     elif ipaddress.ip_address(str(argQuery)) in ipaddress.ip_network('127.16.0.0/12'):
