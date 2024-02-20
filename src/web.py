@@ -46,6 +46,7 @@ parser.add_argument('--cache-mariadb', action=argparse.BooleanOptionalAction, de
 parser.add_argument('--debug-save-in-mariadb-cache', action=argparse.BooleanOptionalAction, default=True)
 parser.add_argument("--console-level", default="INFO")
 parser.add_argument("--log-level", default="INFO")
+parser.add_argument("--vt-api-key", default="")
 
 args = parser.parse_args()
 configFromArg = vars(args)
@@ -741,12 +742,20 @@ def mergeDict(dictOrig: dict, dictToAdd: dict, allowReplacements: bool):
     return dictOrig
 
 def query_virus_total(query_arg_key: str, query_type: str):
+
+    if len(args.vt_api_key) == 0:
+        logging.error("no virus total api key specified. Use --vt-api-key")
+        return {
+            "success": False,
+            "exception": "ERROR! no virus total api key specified. Use --vt-api-key"
+        }
+
     sUrl = "https://www.virustotal.com/api/v3/" + str(query_type) + "/" + str(query_arg_key)
 
     sHeaders = {
             "Accept":"application/json",
             "X-Requested-By":"python-requests",
-            "x-apikey": "214e6bd1febea3c1490efe980e48669bb2a178d4aa427a221f86754cdf73d3c0"
+            "x-apikey": args.vt_api_key
         }
     # sHeaders = mergeDict(sHeaders, {}, True)
 
