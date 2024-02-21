@@ -29,6 +29,8 @@ sudo chmod +x /opt/graylog/lookup-service/update.sh
 # set owner
 touch /opt/graylog/lookup-service/web1.log
 touch /opt/graylog/lookup-service/web2.log
+echo 1 | sudo tee /opt/graylog/lookup-service/health1.txt
+echo 1 | sudo tee /opt/graylog/lookup-service/health2.txt
 sudo chown -R gl_lookup_service:gl_lookup_service /opt/graylog/lookup-service/
 
 # install service.....

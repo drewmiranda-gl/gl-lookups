@@ -47,6 +47,7 @@ parser.add_argument('--debug-save-in-mariadb-cache', action=argparse.BooleanOpti
 parser.add_argument("--console-level", default="INFO")
 parser.add_argument("--log-level", default="INFO")
 parser.add_argument("--vt-api-key", default="")
+parser.add_argument("--healthcheck-file", help="file to use for healthcheck, 1=up, 0=down", default="healthcheck.txt")
 
 args = parser.parse_args()
 configFromArg = vars(args)
@@ -58,6 +59,8 @@ hostName = str(configFromArg['hostname'])
 serverPort = int(configFromArg['port'])
 logFile = str(configFromArg['log'])
 sDbFileName = args.db
+
+healthcheck_file = args.healthcheck_file
 
 mariadb_host = "127.0.0.1"
 mariadb_port = 3306
@@ -932,6 +935,29 @@ def doLookups(argQuery):
     elif sLookup == "cache_dns_answer":
         return cache_dns_answer(oArgs['key'])
 
+def get_text_file_contents(s_filename):
+    if not exists(s_filename):
+        return ""
+    else:
+        file = open(s_filename,'r')
+        content = file.read()
+        file.close()
+        return content
+
+def test_healthcheck_file(s_healthcheck_file):
+    # True = healthcheck passes, server ok
+    # False = healtheck fails, server not ok
+    if not exists(s_healthcheck_file):
+        logging.warn("".join(["Healthcheck file ", s_healthcheck_file, " not found!"]))
+        return True
+
+    file_contents = str(get_text_file_contents(s_healthcheck_file)).strip()
+    logging.debug("".join(["Healthcheck File Contents: ", str(file_contents)]))
+    if file_contents == "0":
+        return False
+    else:
+        return True
+
 def log_level_from_string(log_level: str):
     if log_level.upper() == "DEBUG":
         return logging.DEBUG
@@ -1014,34 +1040,56 @@ class MyServer(BaseHTTPRequestHandler):
             #       goal is to improve throughput of DNS lookups
 
             try:
-                # logging.debug("Lookup Query: " + str(o.query))
-                rs = doLookups(o.query)
+                b_is_healthcheck = False
 
-                if "exception" in rs:
-                    self.send_response(500)
-                    excpInfo = "" + str(rs['exception']) + "; Query: " + str(o.query)
-                    # dicRet = {}
-                    # dicRet["err"] = excpInfo
-                    logging.error(excpInfo)
+                d_parsed_args = parseArgs(o.query)
+                if "haproxy" in d_parsed_args:
+                    if d_parsed_args["haproxy"] == "httpcheck":
+                        b_is_healthcheck = True
+                
+                # logging.debug("Is Healthcheck: " + str(b_is_healthcheck))
+                        
+                if b_is_healthcheck == True:
+                    # logging.debug("Is Healthcheck: " + str(b_is_healthcheck))
                     
-                    dictRs['value'] = ""
-                else:
-                    if rs['value'] == "":
-                        self.send_response(404)
-                    else:
+                    b_healthcheck_file = test_healthcheck_file(healthcheck_file)
+                    if b_healthcheck_file == True:
+                        logging.debug("Healthcheck passed, returning HTTP 200 (up)")
                         self.send_response(200)
-                        if args.log_response == True:
-                            input_args_for_logging = parseArgs(o.query)
-                            log_dict = {
-                                "lookup": input_args_for_logging['lookup'],
-                                "key": input_args_for_logging['key'],
-                                "result": rs['value']
-                            }
-                            logging.info(log_dict)
-                    if "cached" in rs:
-                        if rs['cached'] == 1:
-                            logging.info("[[do_GET]] Cached=1, " + rs['meta'] + ", " + rs['lookup'] + "=" + rs['value'])
-                    dictRs['value'] = rs['value']
+                        dictRs['value'] = "up"
+                    else:
+                        logging.warning("Healthcheck failed, returning HTTP 503 (down)")
+                        self.send_response(503)
+                        dictRs['value'] = "down"
+                else:
+
+                    rs = doLookups(o.query)
+
+                    if "exception" in rs:
+                        self.send_response(500)
+                        excpInfo = "" + str(rs['exception']) + "; Query: " + str(o.query)
+                        # dicRet = {}
+                        # dicRet["err"] = excpInfo
+                        logging.error(excpInfo)
+                        
+                        dictRs['value'] = ""
+                    else:
+                        if rs['value'] == "":
+                            self.send_response(404)
+                        else:
+                            self.send_response(200)
+                            if args.log_response == True:
+                                input_args_for_logging = d_parsed_args
+                                log_dict = {
+                                    "lookup": input_args_for_logging['lookup'],
+                                    "key": input_args_for_logging['key'],
+                                    "result": rs['value']
+                                }
+                                logging.info(log_dict)
+                        if "cached" in rs:
+                            if rs['cached'] == 1:
+                                logging.info("[[do_GET]] Cached=1, " + rs['meta'] + ", " + rs['lookup'] + "=" + rs['value'])
+                        dictRs['value'] = rs['value']
                 
                 y = json.dumps(dictRs)
                 http_write_output = y

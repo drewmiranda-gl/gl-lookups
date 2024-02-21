@@ -69,8 +69,8 @@ fi
 # variable validation
 if [ -z "$1" ]
 then
-      echo "ERROR! you must specify 2 arguments:"
-      echo "service-wrapper.sh <port> <logfile>"
+      echo "ERROR! you must specify 3 arguments:"
+      echo "service-wrapper.sh <port> <logfile> <healthcheck-file>"
       exit 1
 else
       portnum=$1
@@ -78,14 +78,23 @@ fi
 
 if [ -z "$2" ]
 then
-      echo "ERROR! you must specify 2 arguments:"
-      echo "service-wrapper.sh <port> <logfile>"
+      echo "ERROR! you must specify 3 arguments:"
+      echo "service-wrapper.sh <port> <logfile> <healthcheck-file>"
       exit 1
 else
       logfile=$2
 fi
 
+if [ -z "$3" ]
+then
+      echo "ERROR! you must specify 3 arguments:"
+      echo "service-wrapper.sh <port> <logfile> <healthcheck-file>"
+      exit 1
+else
+      healthcheckfile=$3
+fi
+
 echo "Port = ${portnum}"
 
 # get_latest_python_full_path
-$get_latest_python_full_path /opt/graylog/lookup-service/web.py --port $portnum --log $logfile
+$get_latest_python_full_path /opt/graylog/lookup-service/web.py --port $portnum --log $logfile --healthcheck-file $healthcheckfile

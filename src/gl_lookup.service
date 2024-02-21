@@ -10,8 +10,10 @@ Group=gl_lookup_service
 WorkingDirectory=/opt/graylog/lookup-service
 Type=simple
 Restart=always
-ExecStart=/opt/graylog/lookup-service/service-wrapper.sh 8081 /opt/graylog/lookup-service/web1.log
+ExecStart=/opt/graylog/lookup-service/service-wrapper.sh 8081 /opt/graylog/lookup-service/web1.log /opt/graylog/lookup-service/health1.txt
 ExecStartPre=/bin/sleep 60
+ExecStartPost=/opt/graylog/lookup-service/set-health-helper.sh /opt/graylog/lookup-service/health1.txt 1
+ExecStop=/opt/graylog/lookup-service/set-health-helper.sh /opt/graylog/lookup-service/health1.txt 0
 RestartSec=5s
 
 [Install]
