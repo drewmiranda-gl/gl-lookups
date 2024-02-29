@@ -1,0 +1,20 @@
+[Unit]
+Description=Graylog Server Lookup Helper Service
+Requires=network.target remote-fs.target
+After=network.target remote-fs.target
+ConditionPathExists=/opt/graylog/lookup-service
+
+[Service]
+User=gl_lookup_service
+Group=gl_lookup_service
+WorkingDirectory=/opt/graylog/lookup-service
+Type=simple
+Restart=always
+ExecStart=/opt/graylog/lookup-service/service-wrapper.sh 8083 /opt/graylog/lookup-service/web3.log /opt/graylog/lookup-service/health3.txt
+ExecStartPre=/bin/sleep 60
+ExecStartPost=/opt/graylog/lookup-service/set-health-helper.sh /opt/graylog/lookup-service/health3.txt 1
+ExecStop=/opt/graylog/lookup-service/set-health-helper.sh /opt/graylog/lookup-service/health3.txt 0
+RestartSec=5s
+
+[Install]
+WantedBy=multi-user.target

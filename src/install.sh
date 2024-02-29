@@ -29,13 +29,18 @@ sudo chmod +x /opt/graylog/lookup-service/update.sh
 # set owner
 touch /opt/graylog/lookup-service/web1.log
 touch /opt/graylog/lookup-service/web2.log
+touch /opt/graylog/lookup-service/web3.log
+
 echo 1 | sudo tee /opt/graylog/lookup-service/health1.txt
 echo 1 | sudo tee /opt/graylog/lookup-service/health2.txt
+echo 1 | sudo tee /opt/graylog/lookup-service/health3.txt
+
 sudo chown -R gl_lookup_service:gl_lookup_service /opt/graylog/lookup-service/
 
 # install service.....
 sudo cp -f gl_lookup.service /etc/systemd/system/gl_lookup.service
 sudo cp -f gl_lookup2.service /etc/systemd/system/gl_lookup2.service
+sudo cp -f gl_lookup3.service /etc/systemd/system/gl_lookup3.service
 
 sudo systemctl daemon-reload
 
@@ -44,5 +49,8 @@ sudo systemctl start gl_lookup.service
 
 sudo systemctl enable gl_lookup2.service
 sudo systemctl start gl_lookup2.service
+
+sudo systemctl enable gl_lookup3.service
+sudo systemctl start gl_lookup3.service
 
 sudo systemctl restart haproxy
