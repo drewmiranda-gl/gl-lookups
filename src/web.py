@@ -378,6 +378,9 @@ def convert_dict_to_sql_insert(table_name: str, dict_to_use_to_build: dict):
     return str_sql
 
 def save_lookup_in_cache(lookup_table: str, dict_to_cache: dict):
+    if args.cache_mariadb == False:
+        return False
+
     b_error = True
     str_sql = convert_dict_to_sql_insert(lookup_table, dict_to_cache)
     rs_cur = mariadb_get_cur(mariadb_host, mariadb_port, mariadb_user, mariadb_pass, MARIADB_FAIL_NOTFATAL)
@@ -402,6 +405,9 @@ def save_lookup_in_cache(lookup_table: str, dict_to_cache: dict):
         logging.error(f"[[save_lookup_in_cache]] Error: {e} ::: [" + str(lookup_table) + "] " + str(json.dumps(dict_to_cache)))
 
 def delete_lookup_in_cache(lookup_table: str, lookup_key: str):
+    if args.cache_mariadb == False:
+        return False
+    
     b_error = True
     str_sql = "DELETE FROM " + str(lookup_table) + " WHERE ip = '" + str(lookup_key) + "'"
     rs_cur = mariadb_get_cur(mariadb_host, mariadb_port, mariadb_user, mariadb_pass, MARIADB_FAIL_NOTFATAL)
@@ -453,6 +459,9 @@ def cache_result_format(lookup_table: str, row):
     return {}
 
 def get_lookup_from_cache(lookup_table: str, lookup_key: str):
+    if not args.cache_mariadb == True:
+        return {}
+
     b_error = True
     str_sql = "SELECT * FROM " + str(lookup_table) + " WHERE ip = '" + str(lookup_key) + "' ORDER BY date_created DESC LIMIT 1"
     rs_cur = mariadb_get_cur(mariadb_host, mariadb_port, mariadb_user, mariadb_pass, MARIADB_FAIL_NOTFATAL)
@@ -1013,7 +1022,7 @@ logging = logger
 class MyServer(BaseHTTPRequestHandler):
     def setup(self):
         BaseHTTPRequestHandler.setup(self)
-        self.request.settimeout(5)
+        self.request.settimeout(1)
 
     def myLog( self, fmt, request, code, other ):
         # syslog( LOG_INFO, '%s %s' % ( code, request) )
