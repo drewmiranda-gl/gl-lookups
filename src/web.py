@@ -1020,10 +1020,6 @@ logger.addHandler(logging_console_handler)
 logging = logger
 
 class MyServer(BaseHTTPRequestHandler):
-    def setup(self):
-        BaseHTTPRequestHandler.setup(self)
-        self.request.settimeout(1)
-
     def myLog( self, fmt, request, code, other ):
         # syslog( LOG_INFO, '%s %s' % ( code, request) )
         logging.info('[[HTTP]] %s %s' % ( code, request))
