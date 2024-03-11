@@ -260,12 +260,15 @@ def run_init_db_mig(conn, cur, migration_name: str):
         sql = ('ALTER TABLE rdns' + '\n' +
                     'MODIFY COLUMN uid INT auto_increment NOT NULL' + '\n' +
                 ';')
+    elif migration_name == "rdns_index_create_ip":
+        sql = ('CREATE INDEX rdns_ip_IDX USING BTREE ON graylog_lookups.rdns (ip);')
     else:
         return False
     
     try:
         cur.execute(sql)
         conn.commit()
+        logging.info("".join(["[[run_init_db_mig]] migration completed successfully: ", migration_name]))
     except mariadb.Error as e:
         logging.error(f"[[run_init_db_mig]] Error: {e}")
         return False
@@ -325,6 +328,7 @@ def init_cache_db(hostname: str, port: int, username: str, password: str):
     l_migrations = []
     l_migrations.append("rdns_column_add_lookup_source")
     l_migrations.append("rdns_column_alter_uid_int")
+    l_migrations.append("rdns_index_create_ip")
 
     l_existing_mig = []
     
@@ -335,7 +339,7 @@ def init_cache_db(hostname: str, port: int, username: str, password: str):
     
     for mig_to_verify in l_migrations:
         if not mig_to_verify in l_existing_mig:
-            logging.warning("[[init_cache_db]] migration '" + str(mig_to_verify) + " has not run.")
+            logging.warning("[[init_cache_db]] migration '" + str(mig_to_verify) + " has not run. Running now.")
             run_init_db_mig(conn, rs_cur["cursor"], mig_to_verify)
 
     conn.close()
