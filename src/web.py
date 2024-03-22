@@ -512,11 +512,13 @@ def lookupRDns(argQuery):
             ttl = cache_record['ttl']
             date_created = cache_record['date_created']
             int_ttl_compare = int(ttl) + int(date_created)
-            # logging.debug("ttl: " + str(ttl) + ", date_created: " + str(date_created) + "\n" + "Is " + str(int_ttl_compare) + " < " + str(unix_time_now_utc))
-            if int(int_ttl_compare) < int(unix_time_now_utc):
-                logging.debug("Cache TTL Expired, deleting cached record: rdns," + str(argQuery))
+            # logging.debug("ttl: " + str(ttl) + ", date_created: " + str(date_created) + "\n" + "Is " + str(int_ttl_compare) + " < " + str(unix_time_now_utc))            
+            if not int(ttl) == 0 and int(int_ttl_compare) < int(unix_time_now_utc):
+                logger.info("".join([ "Cache TTL of ", str(ttl)," Expired, deleting cached record: rdns,", str(argQuery) ]))
                 delete_lookup_in_cache("rdns", str(argQuery))
             else:
+                if int(ttl) == 0:
+                    logging.debug("".join([ "TTL=0, not expiring: ", str(argQuery) ]))
                 return str_cached_result_returned
         else:
             if 'has_lookup' in cache_record and int(cache_record['has_lookup']) == 0:
