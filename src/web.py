@@ -987,12 +987,11 @@ class ThreadingHTTPServer(socketserver.ThreadingMixIn, http.server.HTTPServer):
     pass
 
 if configFromArg['exit']:
-    rs = doLookups("lookup=" + configFromArg['lookup'] + "&key=" + configFromArg['key'])
-    print(rs)
+    # rs = doLookups("lookup=" + configFromArg['lookup'] + "&key=" + configFromArg['key'])
+    # print(rs)
+    logger.debug( getDiffInDays(1611126694, "utime") )
 else:
     if __name__ == "__main__":
-        
-        # initDb(sDbFileName)
         init_db_success = init_cache_db(mariadb_host, mariadb_port, mariadb_user, mariadb_pass)
         if init_db_success == False:
             logging.error("ERROR! Failed to initialize graylog_lookups MariaDB database.")
