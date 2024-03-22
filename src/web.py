@@ -481,6 +481,14 @@ def validate_ip_addr_ver(ip_string: str, ip_ver: int):
     
     return False
 
+def getDiffInDays(d1: int, date_format: str):
+    if date_format.lower() == "utime":
+        dt = datetime.fromtimestamp(int(d1), timezone.utc)
+        dtnow = datetime.now(timezone.utc)
+        delta = dtnow - dt
+        return delta.days
+    return -1
+
 def lookupRDns(argQuery):
     # log to filter out/ignore
     #   255.255.255.255
