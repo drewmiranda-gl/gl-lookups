@@ -69,54 +69,6 @@ def getUnixTimeUtc():
     utime = datetime.now(timezone.utc).timestamp()
     return int(round(utime, 0))
 
-def getDbCur(sArgDbFile):
-    con = sqlite3.connect(sArgDbFile)
-    cur = con.cursor()
-    return {"con": con, "cur": cur}
-
-def dbExecute(sArgDbFile, stmnt):
-    if args.debug == False:
-        cur = getDbCur(sArgDbFile)['cur']
-
-        try:
-            # cur.execute('CREATE TABLE "rdns" ("ip" TEXT,"name" TEXT,"has_lookup" INTEGER DEFAULT 0);')
-            cur.execute(stmnt)
-
-        except Exception as e:
-            # print(e)
-            # print(errorText + "ERROR, failed to create table `rdns`" + defText)
-            a = 1
-    else:
-        print("DEBUG: Skipping dbCreateTable()")
-
-def initDb(sArgDbFile):
-    create_table_statement = 'CREATE TABLE "rdns" ("ip" TEXT, "name" TEXT, "has_lookup" INTEGER DEFAULT 0, "ttl" INTEGER DEFAULT 86400, "date_created" INTEGER DEFAULT 0);'
-
-    if exists(sArgDbFile):
-        cur = getDbCur(sArgDbFile)['cur']
-        # cur.execute("CREATE TABLE rdns(ip, name)")
-        try:
-            res = cur.execute("SELECT ip, name, has_lookup FROM rdns")
-        except:
-            print("Creating database using " + str(sArgDbFile))
-            dbExecute(sArgDbFile, create_table_statement)
-        
-        try:
-            res = cur.execute("SELECT ttl FROM rdns")
-        except:
-            print("Adding 'ttl' column using " + str(sArgDbFile))
-            dbExecute(sArgDbFile, 'ALTER TABLE rdns ADD "ttl" INTEGER DEFAULT 86400')
-        
-        try:
-            res = cur.execute("SELECT date_created FROM rdns")
-        except:
-            print("Adding 'date_created', 'date_created' column using " + str(sArgDbFile))
-            dbExecute(sArgDbFile, 'ALTER TABLE rdns ADD "date_created" INTEGER DEFAULT 0')
-        
-    else:
-        print("Creating database using " + str(sArgDbFile))
-        dbExecute(sArgDbFile, create_table_statement)
-
 def mariadb_get_cur(mdb_hostname: str, mdb_port: int, mdb_username: str, mdb_password: str, b_fail_fatal: bool):
     # Connect to MariaDB Platform
     try:
@@ -485,86 +437,11 @@ def get_lookup_from_cache(lookup_table: str, lookup_key: str):
         conn.close()
         logging.error(f"[[get_lookup_from_cache]] Error: {e}")
 
-def getDbRow(sArgDbFile, strSql):
-    if exists(sArgDbFile):
-        cur = getDbCur(sArgDbFile)['cur']
-        try:
-            res = cur.execute(strSql)
-            ip, name, has_lookup, ttl, date_created = res.fetchone()
-
-            if has_lookup == int(1):
-                bHasLookup = True
-            else:
-                bHasLookup = False
-
-            dRs = {
-                "ip": ip,
-                "name": name,
-                "has_lookup": bHasLookup,
-                "ttl": ttl,
-                "date_created": date_created
-            }
-            return dRs
-        
-        except Exception as e:
-            # print(e)
-            # dbCreateTable(sArgDbFile)
-            a = 1
-            return {}
-
-def deleteIp(sArgDbFile, sArgIp):
-    print("Deleting IP: " + str(sArgIp))
-
-    oDb = getDbCur(sArgDbFile)
-    cur = oDb['cur']
-    con = oDb['con']
-    try:
-        sSqlExec = "DELETE FROM rdns WHERE ip = '" + str(sArgIp) + "'"
-        cur.execute(sSqlExec)
-        con.commit()
-    except Exception as e:
-        a = 1
-
-def addTimeoutIp(sArgDbFile, sArgIp, sArgHostname):
-    print("Adding IP to cache: " + str(sArgIp))
-    # add IP address to sqllite db, will only add if does not already exist
-    oDb = getDbCur(sArgDbFile)
-    cur = oDb['cur']
-    con = oDb['con']
-
-    # does exist?
-    res = cur.execute("SELECT * FROM rdns WHERE ip = '" + str(sArgIp) + "'")
-    bExists = False
-    for row in res:
-        bExists = True
-        break
-
-    if len(sArgHostname) > 0:
-        has_lookup = 1
-    else:
-        has_lookup = 0
-
-    if bExists == False:
-        # Insert, does not already exist
-        try:
-            unix_time = str(getUnixTimeUtc())
-            sSqlExec = "INSERT INTO rdns VALUES ('" + str(sArgIp) + "', '" + str(sArgHostname) + "', '" + str(has_lookup) + "', 604800, " + unix_time + ")"
-            print(sSqlExec)
-            cur.execute(sSqlExec)
-            con.commit()
-            
-        except Exception as e:
-            # print(e)
-            # print("ERROR, failed insert for ip '" + str(sArgIp) + "'")
-            a = 1
-
 def get_ipv4_by_hostname(hostname):
-    import socket
     rs = socket.gethostbyname(hostname)
     return rs
 
 def get_domain_name(ip_address):
-    import socket
     socket.setdefaulttimeout(5)
 
     try:
