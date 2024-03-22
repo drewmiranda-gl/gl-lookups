@@ -573,10 +573,8 @@ def lookupRDns(argQuery):
             # if configFromArg['verbose'] == True:
             #     print("exeption is in result")
             # add to db for future exclusion
-            addTimeoutIp(sDbFileName, argQuery, '')
             return result
         else:
-            addTimeoutIp(sDbFileName, argQuery, result)
             if args.debug_save_in_mariadb_cache == True:
                 b_is_ip = validate_ip_addr_ver(str(argQuery), 4)
                 if b_is_ip == True:
