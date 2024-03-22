@@ -787,6 +787,7 @@ def cache_dns_answer(arg_query):
                 logging.debug(dict_to_cache)
                 delete_lookup_in_cache("rdns", str(one_answer))
                 save_lookup_in_cache("rdns", dict_to_cache)
+
                 logging.info("[[cache_dns_answer]] caching query and answer from zeek DNS logging. " + str(one_answer) + "=" + str(s_query))
 
     return {"value":""}
