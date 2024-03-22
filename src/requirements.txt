@@ -1,4 +1,4 @@
-colorlog==6.7.0
-mariadb==1.1.7
+colorlog==6.8.2
+mariadb==1.1.10
 Requests==2.31.0
-urllib3==1.26.17
+urllib3==2.2.1
