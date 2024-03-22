@@ -15,7 +15,8 @@ import socketserver
 import http.server
 import colorlog
 from colorlog import ColoredFormatter
-from threading import Thread
+import socket
+from datetime import datetime, timezone, date, timedelta
 
 # ----
 # mac notes - fix urllib warnings
@@ -65,8 +66,7 @@ MARIADB_FAIL_FATAL = True
 MARIADB_FAIL_NOTFATAL = False
 
 def getUnixTimeUtc():
-    from datetime import datetime
-    utime = datetime.utcnow().timestamp()
+    utime = datetime.now(timezone.utc).timestamp()
     return int(round(utime, 0))
 
 def getDbCur(sArgDbFile):
