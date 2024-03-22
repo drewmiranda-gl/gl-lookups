@@ -1,21 +1,16 @@
 # TODO
 # - add generic web query function
 
-from http.server import BaseHTTPRequestHandler, HTTPServer
-from unittest import result
+from http.server import BaseHTTPRequestHandler
 from urllib.parse import urlparse
 import urllib.parse
-import time
 import json
 import argparse
-# import sys
 import logging
 import ipaddress
-import sqlite3
 from os.path import exists
 import requests
 import mariadb
-# import mysql.connector
 import socketserver
 import http.server
 import colorlog
