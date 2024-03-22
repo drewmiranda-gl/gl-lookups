@@ -855,17 +855,6 @@ def log_level_from_string(log_level: str):
 
     return logging.INFO
 
-# logging.basicConfig(
-#         filename=logFile,
-#         encoding='utf-8',
-#         level=logging.DEBUG,
-#         format='%(asctime)s %(levelname)-8s %(message)s',
-#         datefmt='%Y-%m-%d %H:%M:%S'
-#     )
-
-
-
-
 # handlers
 logging_file_handler = logging.FileHandler(logFile)
 logging_file_handler.setLevel(log_level_from_string(str(args.log_level)))
