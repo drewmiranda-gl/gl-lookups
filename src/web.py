@@ -44,6 +44,7 @@ parser.add_argument("--console-level", default="INFO")
 parser.add_argument("--log-level", default="INFO")
 parser.add_argument("--vt-api-key", default="")
 parser.add_argument("--healthcheck-file", help="file to use for healthcheck, 1=up, 0=down", default="healthcheck.txt")
+parser.add_argument("--cache-ttl", help="Number of seconds to cache record for. After this time record is deleted. Use 0 to disable TTL.", default=0, type=int)
 
 args = parser.parse_args()
 configFromArg = vars(args)
@@ -778,7 +779,7 @@ def cache_dns_answer(arg_query):
                     "name": str(s_query),
                     "has_lookup": 1,
                     "lookup_source": "zeek",
-                    "ttl": 604800,
+                    "ttl": int(args.cache_ttl),
                     "date_created": getUnixTimeUtc()
                 }
                 logging.debug(dict_to_cache)
