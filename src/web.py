@@ -277,6 +277,7 @@ def init_cache_db(hostname: str, port: int, username: str, password: str):
     l_migrations.append("rdns_column_add_lookup_source")
     l_migrations.append("rdns_column_alter_uid_int")
     l_migrations.append("rdns_index_create_ip")
+    # l_migrations.append("permanent_rdns_index_create_ip")
 
     l_existing_mig = []
     
@@ -405,7 +406,8 @@ def cache_result_format(lookup_table: str, row):
                 "name": row[lookup_list_field_pos["name"]],
                 "has_lookup": row[lookup_list_field_pos["has_lookup"]],
                 "ttl": row[lookup_list_field_pos["ttl"]],
-                "date_created": row[lookup_list_field_pos["date_created"]]
+                "date_created": row[lookup_list_field_pos["date_created"]],
+                "lookup_source": row[lookup_list_field_pos["lookup_source"]]
             }
     
     return {}
@@ -513,7 +515,13 @@ def lookupRDns(argQuery):
             "cached": 1
         }
 
-        # logging.debug("Cache record returned: " + str(cache_record))
+        if 'ttl' in cache_record:
+            str_cached_result_returned["ttl"] = cache_record['ttl']
+        if 'date_created' in cache_record:
+            str_cached_result_returned["age_days"] = str(getDiffInDays(int(cache_record['date_created']), "utime"))
+        if "lookup_source" in cache_record:
+            str_cached_result_returned["lookup_source"] = cache_record["lookup_source"]
+
         # check for TTL expiration
         unix_time_now_utc = getUnixTimeUtc()
         if 'ttl' in cache_record and 'date_created' in cache_record:
@@ -968,7 +976,18 @@ class MyServer(BaseHTTPRequestHandler):
                                 logging.info(log_dict)
                         if "cached" in rs:
                             if rs['cached'] == 1:
-                                logging.info("[[do_GET]] Cached=1, " + rs['meta'] + ", " + rs['lookup'] + "=" + rs['value'])
+                                sTtlConcat = ""
+                                sAgeDaysConcat = ""
+                                sLookupSourceConcat = ""
+
+                                if "ttl" in rs:
+                                    sTtlConcat = "".join([ ", TTL=", str(rs['ttl'])])
+                                if "age_days" in rs:
+                                    sAgeDaysConcat = "".join([ ", age_days=", str(rs['age_days'])])
+                                if "lookup_source" in rs:
+                                    sLookupSourceConcat = "".join([ ", lookup_source=", str(rs['lookup_source'])])
+
+                                logger.info("".join([ "[[do_GET]] Cached=1", sTtlConcat, sAgeDaysConcat, sLookupSourceConcat, ", ", str(rs['meta']), ", ", str(rs['lookup']), "=", str(rs['value']) ]))
                         dictRs['value'] = rs['value']
                 
                 y = json.dumps(dictRs)
