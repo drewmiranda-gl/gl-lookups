@@ -44,7 +44,7 @@ parser.add_argument("--console-level", default="INFO")
 parser.add_argument("--log-level", default="INFO")
 parser.add_argument("--vt-api-key", default="")
 parser.add_argument("--healthcheck-file", help="file to use for healthcheck, 1=up, 0=down", default="healthcheck.txt")
-parser.add_argument("--cache-ttl", help="Number of seconds to cache record for. After this time record is deleted. Use 0 to disable TTL.", default=0, type=int)
+parser.add_argument("--cache-ttl", help="Number of seconds to cache record for. After this time record is deleted. Use 0 to disable TTL.", default=86400, type=int)
 
 args = parser.parse_args()
 configFromArg = vars(args)
