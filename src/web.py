@@ -40,6 +40,7 @@ parser.add_argument("--db", help="Sqlite DB File", default="searches.db")
 parser.add_argument('--log_response', action=argparse.BooleanOptionalAction, default=False)
 parser.add_argument('--cache-mariadb', action=argparse.BooleanOptionalAction, default=True)
 parser.add_argument('--debug-save-in-mariadb-cache', action=argparse.BooleanOptionalAction, default=True)
+parser.add_argument('--debug-allow-cache-ttl-delete', action=argparse.BooleanOptionalAction, default=True)
 parser.add_argument("--console-level", default="INFO")
 parser.add_argument("--log-level", default="INFO")
 parser.add_argument("--vt-api-key", default="")
@@ -358,6 +359,10 @@ def save_lookup_in_cache(lookup_table: str, dict_to_cache: dict):
         logging.error(f"[[save_lookup_in_cache]] Error: {e} ::: [" + str(lookup_table) + "] " + str(json.dumps(dict_to_cache)))
 
 def delete_lookup_in_cache(lookup_table: str, lookup_key: str):
+    if args.debug_allow_cache_ttl_delete == False:
+        logger.debug("--no-debug-allow-cache-ttl-delete used, Skipping Cache Delete")
+        return False
+
     if args.cache_mariadb == False:
         return False
     
