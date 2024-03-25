@@ -675,10 +675,7 @@ def lookupRDns(argQuery):
             "lookup_source": "dns",
             "date_created": getUnixTimeUtc()
         }
-        if len(result) > 0:
-            has_lookup = 1
-        else:
-            has_lookup = 0
+
         dict_to_cache["has_lookup"] = has_lookup
 
         if "exception" in result:
@@ -687,8 +684,15 @@ def lookupRDns(argQuery):
             # add to db for future exclusion
             return result
         else:
+            # prevent caching empty lookups
+            if has_lookup == 1:
                 if b_historic_cache_record == True:
                     logger.info("".join([ "[[lookupRDns]] reviving historic rdns record.", " ", json.dumps(dict_to_cache) ]))
+
+                if args.debug_save_in_mariadb_cache == True:
+                    b_is_ip = validate_ip_addr_ver(str(argQuery), 4)
+                    if b_is_ip == True:
+                        save_lookup_in_cache("rdns", dict_to_cache)
 
         return {
             "value": result,
