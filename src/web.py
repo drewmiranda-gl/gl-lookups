@@ -255,6 +255,37 @@ def run_init_db_mig(conn, cur, migration_name: str):
     elif migration_name == "historic_rdns_index_create_ip":
         sql = ('CREATE UNIQUE INDEX historic_rdns_ip_IDX USING BTREE ON graylog_lookups.historic_rdns (ip);')
     
+    elif migration_name == "rdns_convert_name_from_text_to_varchar":
+        sql = ('ALTER TABLE graylog_lookups.rdns MODIFY COLUMN name VARCHAR(255) CHARACTER SET utf8mb4 COLLATE utf8mb4_general_ci DEFAULT NULL NULL;')
+
+    elif migration_name == "remove_duplicates_from_rdns":
+        sql = '''
+        DELETE FROM rdns WHERE uid IN (
+            SELECT uid FROM rdns WHERE ip in
+            (
+                SELECT
+                    ip
+                FROM
+                    graylog_lookups.rdns AS r
+                GROUP BY
+                    r.name, r.ip
+                HAVING count(r.name) > 1
+            ) AND uid NOT in (
+                SELECT
+                    max(uid)
+                FROM
+                    graylog_lookups.rdns AS r
+                GROUP BY
+                    r.name, r.ip
+                HAVING count(r.name) > 1
+                ORDER BY uid DESC
+            )
+        )
+        '''
+    
+    elif migration_name == "rdns_make_ip_name_uniq": 
+        sql = 'CREATE UNIQUE INDEX rdns_ip_name_uniq USING BTREE ON graylog_lookups.rdns (ip,name);'
+    
     else:
         return False
     
@@ -325,6 +356,10 @@ def init_cache_db(hostname: str, port: int, username: str, password: str):
     l_migrations.append("rdns_column_alter_uid_int")
     l_migrations.append("rdns_index_create_ip")
     l_migrations.append("historic_rdns_index_create_ip")
+    l_migrations.append("rdns_convert_name_from_text_to_varchar")
+    l_migrations.append("remove_duplicates_from_rdns")
+    l_migrations.append("rdns_make_ip_name_uniq")
+
     # l_migrations.append("permanent_rdns_index_create_ip")
 
     l_existing_mig = []
