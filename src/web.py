@@ -263,7 +263,8 @@ def run_init_db_mig(conn, cur, migration_name: str):
         conn.commit()
         logging.info("".join(["[[run_init_db_mig]] migration completed successfully: ", migration_name]))
     except mariadb.Error as e:
-        logging.error(f"[[run_init_db_mig]] Error: {e}")
+        logging.critical(f"[[run_init_db_mig]] Error: {e}")
+        exit(1)
         return False
     
     save_mig_state = "INSERT INTO migrations (mig_name) VALUES ('" + str(migration_name) + "')"
