@@ -578,7 +578,7 @@ def lookupRDns(argQuery):
         dict_to_cache = {
             "ip": str(argQuery),
             "name": str(result),
-            "ttl": 604800,
+            "ttl": int(args.cache_ttl),
             "lookup_source": "dns",
             "date_created": getUnixTimeUtc()
         }
