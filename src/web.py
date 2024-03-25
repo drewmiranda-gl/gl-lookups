@@ -680,8 +680,7 @@ def lookupRDns(argQuery):
             "meta": "query ignored, no result returned."
         }
     else:
-        # result = get_domain_name(argQuery)
-        result = ""
+        result = get_domain_name(argQuery)
 
         if len(result) > 0:
             has_lookup = 1
