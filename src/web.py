@@ -110,6 +110,29 @@ def mariadb_get_cur(mdb_hostname: str, mdb_port: int, mdb_username: str, mdb_pas
                     "error": str(e)
                 }
 
+def mariadb_exec_sql(sql_stmnt: str):
+    b_error = True
+    rs_cur = mariadb_get_cur(mariadb_host, mariadb_port, mariadb_user, mariadb_pass, MARIADB_FAIL_NOTFATAL)
+    if rs_cur:
+        if "cursor" in rs_cur and "conn" in rs_cur:
+            cur = rs_cur["cursor"]
+            conn = rs_cur["conn"]
+            b_error = False
+
+    if b_error == True:
+        return False
+
+    try:
+        # print(str_sql)
+        cur.execute(sql_stmnt)
+        # print(f"{cur.rowcount} details inserted")
+        conn.commit()
+        conn.close()
+        logger.debug("".join([ "[[mariadb_exec_sql]]", " SQL Statement succeeded!: ", "\n", sql_stmnt ]))
+    except mariadb.Error as e:
+        conn.close()
+        logger.debug("".join([ "[[mariadb_exec_sql]]", " SQL Statement FAILED!: ", "\n", sql_stmnt ]))
+        logging.error(f"[[mariadb_exec_sql]] Error: {e}")
 
 def create_cache_db(mdb_hostname: str, mdb_port: int, mdb_username: str, mdb_password: str):
     # mydb = mysql.connector.connect(
