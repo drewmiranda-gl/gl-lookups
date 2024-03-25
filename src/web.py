@@ -1063,18 +1063,27 @@ class MyServer(BaseHTTPRequestHandler):
                                 logging.info(log_dict)
                         if "cached" in rs:
                             if rs['cached'] == 1:
+                                dForJson = {}
+                                dForJson["cached"] = 1
+                                dForJson["function"] = "do_GET"
+                                
                                 sTtlConcat = ""
                                 sAgeDaysConcat = ""
                                 sLookupSourceConcat = ""
 
                                 if "ttl" in rs:
                                     sTtlConcat = "".join([ ", TTL=", str(rs['ttl'])])
+                                    dForJson["ttl"] = rs["ttl"]
                                 if "age_days" in rs:
                                     sAgeDaysConcat = "".join([ ", age_days=", str(rs['age_days'])])
+                                    dForJson["age_days"] = rs["age_days"]
                                 if "lookup_source" in rs:
                                     sLookupSourceConcat = "".join([ ", lookup_source=", str(rs['lookup_source'])])
+                                    dForJson["lookup_source"] = rs["lookup_source"]
+                                
+                                sJsonConcat = "".join([ " ", str(json.dumps(dForJson)) ])
 
-                                logger.info("".join([ "[[do_GET]] Cached=1", sTtlConcat, sAgeDaysConcat, sLookupSourceConcat, ", ", str(rs['meta']), ", ", str(rs['lookup']), "=", str(rs['value']) ]))
+                                logger.info("".join([ "[[do_GET]] Cached=1", ", ", str(rs['meta']), ", ", str(rs['lookup']), "=", str(rs['value']), sJsonConcat ]))
                         dictRs['value'] = rs['value']
                 
                 y = json.dumps(dictRs)
