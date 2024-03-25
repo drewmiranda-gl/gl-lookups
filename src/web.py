@@ -195,6 +195,23 @@ def get_table_create_sql(tablename: str):
                     'data TEXT,' + '\n' +
                     'PRIMARY KEY (uid)' + '\n' +
                 ');')
+    elif tablename == "historic_rdns":
+
+        # ip            TEXT
+        # name          TEXT
+        # has_lookup    INT (0/1)
+        # ttl           INT
+        # date_created  INT
+
+        sql = ('CREATE TABLE historic_rdns (' + '\n' +
+                    'uid MEDIUMINT NOT NULL AUTO_INCREMENT,' + '\n' +
+                    'ip VARCHAR(15) NOT NULL,' + '\n' +
+                    'name TEXT,' + '\n' +
+                    'lookup_source VARCHAR(255) DEFAULT \'\' NOT NULL,' + '\n' +
+                    'date_created_rdns VARCHAR(15) NOT NULL,' + '\n' +
+                    'date_created DATETIME NULL,' + '\n' +
+                    'PRIMARY KEY (uid)' + '\n' +
+                ');')
     
     return sql
 
@@ -234,6 +251,10 @@ def run_init_db_mig(conn, cur, migration_name: str):
                 ';')
     elif migration_name == "rdns_index_create_ip":
         sql = ('CREATE INDEX rdns_ip_IDX USING BTREE ON graylog_lookups.rdns (ip);')
+
+    elif migration_name == "historic_rdns_index_create_ip":
+        sql = ('CREATE UNIQUE INDEX historic_rdns_ip_IDX USING BTREE ON graylog_lookups.historic_rdns (ip);')
+    
     else:
         return False
     
@@ -278,6 +299,7 @@ def init_cache_db(hostname: str, port: int, username: str, password: str):
     l_cache_tables = []
     l_cache_tables.append("rdns")
     l_cache_tables.append("migrations")
+    l_cache_tables.append("historic_rdns")
 
     l_existing_tables = []
 
@@ -301,6 +323,7 @@ def init_cache_db(hostname: str, port: int, username: str, password: str):
     l_migrations.append("rdns_column_add_lookup_source")
     l_migrations.append("rdns_column_alter_uid_int")
     l_migrations.append("rdns_index_create_ip")
+    l_migrations.append("historic_rdns_index_create_ip")
     # l_migrations.append("permanent_rdns_index_create_ip")
 
     l_existing_mig = []
@@ -389,6 +412,11 @@ def delete_lookup_in_cache(lookup_table: str, lookup_key: str):
     if args.cache_mariadb == False:
         return False
     
+    # delete should MOVE record to a long term table
+    # IF a new entry cannot be found after cache is cleared, repopulate using default TTL
+    str_sql = "".join(["INSERT INTO historic_rdns (ip, name, lookup_source, date_created_rdns, date_created) SELECT ip,name,lookup_source ,date_created,UTC_TIMESTAMP() FROM ", str(lookup_table)," WHERE ip = '", str(lookup_key),"'"])
+    mariadb_exec_sql(str_sql)
+
     b_error = True
     str_sql = "DELETE FROM " + str(lookup_table) + " WHERE ip = '" + str(lookup_key) + "'"
     rs_cur = mariadb_get_cur(mariadb_host, mariadb_port, mariadb_user, mariadb_pass, MARIADB_FAIL_NOTFATAL)
@@ -424,6 +452,7 @@ def list_to_numbers(input_list: list):
 def cache_result_format(lookup_table: str, row):
     dict_field_pos = {}
     dict_field_pos["rdns"] = ["uid", "ip", "name", "has_lookup", "lookup_source", "ttl", "date_created"]
+    dict_field_pos["historic_rdns"] = ["uid", "ip", "name", "lookup_source", "ttl", "date_created_rdns", "date_created"]
     
     lookup_list_field_pos = list_to_numbers(dict_field_pos[lookup_table])
 
@@ -435,6 +464,16 @@ def cache_result_format(lookup_table: str, row):
                 "has_lookup": row[lookup_list_field_pos["has_lookup"]],
                 "ttl": row[lookup_list_field_pos["ttl"]],
                 "date_created": row[lookup_list_field_pos["date_created"]],
+                "lookup_source": row[lookup_list_field_pos["lookup_source"]]
+            }
+    elif lookup_table == "historic_rdns":
+        if row:
+            return {
+                "ip": row[lookup_list_field_pos["ip"]],
+                "name": row[lookup_list_field_pos["name"]],
+                "has_lookup": 1,
+                "ttl": row[lookup_list_field_pos["ttl"]],
+                "date_created": row[lookup_list_field_pos["date_created_rdns"]],
                 "lookup_source": row[lookup_list_field_pos["lookup_source"]]
             }
     
@@ -529,6 +568,7 @@ def lookupRDns(argQuery):
     #       192.168.0.0/16 (192.168.0.0 - 192.168.255.255)
     #   multicast/broadcast
 
+    b_historic_cache_record = False
     cache_record = {}
     if args.cache_mariadb == True:
         cache_record = get_lookup_from_cache("rdns", str(argQuery))
@@ -601,7 +641,28 @@ def lookupRDns(argQuery):
             "meta": "query ignored, no result returned."
         }
     else:
-        result = get_domain_name(argQuery)
+        # result = get_domain_name(argQuery)
+        result = ""
+
+        if len(result) > 0:
+            has_lookup = 1
+        else:
+            has_lookup = 0
+            # if no live result, check historical long term table
+            historic_cache_record = get_lookup_from_cache("historic_rdns", str(argQuery))
+            logger.debug("".join([ "historic_cache_record = ", str(historic_cache_record) ]))
+            b_continue = True
+
+            if not len(historic_cache_record):
+                logger.debug("Pass len(historic_cache_record)")
+                b_continue = False
+            if not "name" in historic_cache_record:
+                b_continue = False
+            if b_continue == True:
+                result = historic_cache_record["name"]
+                has_lookup = 1
+                b_historic_cache_record = True
+        
 
         dict_to_cache = {
             "ip": str(argQuery),
@@ -622,10 +683,8 @@ def lookupRDns(argQuery):
             # add to db for future exclusion
             return result
         else:
-            if args.debug_save_in_mariadb_cache == True:
-                b_is_ip = validate_ip_addr_ver(str(argQuery), 4)
-                if b_is_ip == True:
-                    save_lookup_in_cache("rdns", dict_to_cache)
+                if b_historic_cache_record == True:
+                    logger.info("".join([ "[[lookupRDns]] reviving historic rdns record.", " ", json.dumps(dict_to_cache) ]))
 
         return {
             "value": result,
