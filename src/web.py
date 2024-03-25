@@ -336,7 +336,7 @@ def init_cache_db(hostname: str, port: int, username: str, password: str):
     
     for mig_to_verify in l_migrations:
         if not mig_to_verify in l_existing_mig:
-            logging.warning("[[init_cache_db]] migration '" + str(mig_to_verify) + " has not run. Running now.")
+            logging.info("[[init_cache_db]] migration '" + str(mig_to_verify) + " has not run. Running now.")
             run_init_db_mig(conn, rs_cur["cursor"], mig_to_verify)
 
     conn.close()
