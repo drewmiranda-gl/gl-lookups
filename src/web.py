@@ -486,6 +486,7 @@ def get_lookup_from_cache(lookup_table: str, lookup_key: str):
 
     b_error = True
     str_sql = "SELECT * FROM " + str(lookup_table) + " WHERE ip = '" + str(lookup_key) + "' ORDER BY date_created DESC LIMIT 1"
+    logger.debug(str_sql)
     rs_cur = mariadb_get_cur(mariadb_host, mariadb_port, mariadb_user, mariadb_pass, MARIADB_FAIL_NOTFATAL)
 
     if rs_cur:
