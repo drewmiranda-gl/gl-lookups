@@ -449,6 +449,13 @@ def convert_dict_to_sql_insert(table_name: str, dict_to_use_to_build: dict):
     
     return str_sql
 
+def does_key_exist_in_table(lookup_table: str, key_column: str, key_to_find: str):
+    # mariadb_exec_sql("".join([ "SELECT * FROM ", str(lookup_table), " WHERE ", str(key_column), " = '", str(key_to_find), "'"]))
+    row = mariadb_exec_sql_safe("".join([ "SELECT * FROM ", str(lookup_table), " WHERE ", str(key_column), " =  %(key_to_find)s"]), {'key_to_find': key_to_find})
+    if row:
+        return True
+    return False
+
 def save_lookup_in_cache(lookup_table: str, dict_to_cache: dict):
     if args.cache_mariadb == False:
         return False
