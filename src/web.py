@@ -494,8 +494,19 @@ def delete_lookup_in_cache(lookup_table: str, lookup_key: str):
     
     # delete should MOVE record to a long term table
     # IF a new entry cannot be found after cache is cleared, repopulate using default TTL
-    str_sql = "".join(["INSERT INTO historic_rdns (ip, name, lookup_source, date_created_rdns, date_created) SELECT ip,name,lookup_source ,date_created,UTC_TIMESTAMP() FROM ", str(lookup_table)," WHERE ip = '", str(lookup_key),"'"])
-    mariadb_exec_sql(str_sql)
+    b_historical_record_exists = does_key_exist_in_table("rdns", "ip", str(lookup_key))
+    if not b_historical_record_exists:
+        # insert
+        str_sql = "".join(["INSERT INTO historic_rdns (ip, name, lookup_source, date_created_rdns, date_created) SELECT ip,name,lookup_source ,date_created,UTC_TIMESTAMP() FROM ", str(lookup_table)," WHERE ip = '", str(lookup_key),"'"])
+        mariadb_exec_sql(str_sql)
+    else:
+        # update?
+        logger.debug("".join([ "Already exists in historic_rdns ip=", str(lookup_key) ]))
+        mariadb_exec_sql_safe(
+            "UPDATE historic_rdns SET date_created=UTC_TIMESTAMP() WHERE ip =%(key_to_find)s",
+            {'key_to_find': str(lookup_key)}
+        )
+
 
     b_error = True
     str_sql = "DELETE FROM " + str(lookup_table) + " WHERE ip = '" + str(lookup_key) + "'"
@@ -1203,7 +1214,11 @@ class ThreadingHTTPServer(socketserver.ThreadingMixIn, http.server.HTTPServer):
 if configFromArg['exit']:
     # rs = doLookups("lookup=" + configFromArg['lookup'] + "&key=" + configFromArg['key'])
     # print(rs)
-    logger.debug( getDiffInDays(1611126694, "utime") )
+    a=1
+    b_exists = does_key_exist_in_table("rdns", "ip", "192.168.0.1")
+    logger.debug(b_exists)
+    
+
 else:
     if __name__ == "__main__":
         init_db_success = init_cache_db(mariadb_host, mariadb_port, mariadb_user, mariadb_pass)
