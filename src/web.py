@@ -481,6 +481,7 @@ def save_lookup_in_cache(lookup_table: str, dict_to_cache: dict):
         logging.debug("[[save_lookup_in_cache]] cached: [" + str(lookup_table) + "] " + str(json.dumps(dict_to_cache)))
     except mariadb.Error as e:
         conn.close()
+        dict_to_cache["sqr_sql"] = str_sql
         logging.error(f"[[save_lookup_in_cache]] Error: {e} ::: [" + str(lookup_table) + "] " + str(json.dumps(dict_to_cache)))
 
 def delete_lookup_in_cache(lookup_table: str, lookup_key: str):
