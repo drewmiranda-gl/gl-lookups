@@ -46,6 +46,7 @@ parser.add_argument("--log-level", default="INFO")
 parser.add_argument("--vt-api-key", default="")
 parser.add_argument("--healthcheck-file", help="file to use for healthcheck, 1=up, 0=down", default="healthcheck.txt")
 parser.add_argument("--cache-ttl", help="Number of seconds to cache record for. After this time record is deleted. Use 0 to disable TTL.", default=86400, type=int)
+parser.add_argument("--find-dns-for-ip-without-ptr", action=argparse.BooleanOptionalAction, default=False)
 
 args = parser.parse_args()
 configFromArg = vars(args)
@@ -1211,14 +1212,81 @@ class ThreadingHTTPServer(socketserver.ThreadingMixIn, http.server.HTTPServer):
     daemon_threads = True
     pass
 
+if args.find_dns_for_ip_without_ptr == True:
+    # Search graylog
+    #   IPs without PTR/Reverse DNS
+    # _exists_:destination_ip AND NOT _exists_:destination_ip_dns AND destination_ip:"0.0.0.0/0" AND NOT destination_ip:"172.16.0.0/12" AND NOT destination_ip:"10.0.0.0/8" AND NOT destination_ip:"192.168.0.0/16" AND NOT destination_ip:255.255.255.255 AND NOT destination_ip:239.255.255.250 AND NOT destination_ip:224.0.0.252 AND _exists_:destination_ip_as_number
+
+    from py_graylog_api.py_graylog_api import py_graylog_api
+
+    s_graylog_server = "https://hplap.geek4u.net:443"
+    s_api_url = "/api/search/aggregate"
+    s_token = "1kb91i1pud4dd62nbugu607asfda88t0amnicequvimefau2f2g9"
+    s_query = '_exists_:destination_ip AND NOT _exists_:destination_ip_dns AND destination_ip:"0.0.0.0/0" AND NOT destination_ip:"172.16.0.0/12" AND NOT destination_ip:"10.0.0.0/8" AND NOT destination_ip:"192.168.0.0/16" AND NOT destination_ip:255.255.255.255 AND NOT destination_ip:239.255.255.250 AND NOT destination_ip:224.0.0.252 AND _exists_:destination_ip_as_number'
+
+    my_params = {
+        "query": '_exists_:destination_ip AND NOT _exists_:destination_ip_dns AND destination_ip:"0.0.0.0/0" AND NOT destination_ip:"172.16.0.0/12" AND NOT destination_ip:"10.0.0.0/8" AND NOT destination_ip:"192.168.0.0/16" AND NOT destination_ip:255.255.255.255 AND NOT destination_ip:239.255.255.250 AND NOT destination_ip:224.0.0.252 AND _exists_:destination_ip_as_number',
+        "streams": "63068dc98a735a37e8d535f9",
+        "timerange": 3600,
+        "search_type": {
+            "type": "aggregation",
+            "field": "destination_ip",
+            "limit": 100
+        },
+        "jsonpath": "results.*.search_types.*.rows[*].key[0]"
+    }
+    l_ips = py_graylog_api.views_search(s_graylog_server, s_token, my_params)
+    logger.info("".join([ "Found ", str(len(l_ips)), " ips without rdns/ptr info." ]))
+
+    my_params_for_zeek_search = {
+        "sreams": "63068dc98a735a37e8d535f9",
+        "timerange": 2592000,
+        "groups": "pf_syslog_js_query,pf_syslog_js_server_name",
+        "options": {}
+    }
+
+    for ip in l_ips:
+        b_found_result = False
+        logger.debug("".join([ "IP without rdns info: ", str(ip) ]))
+        if (
+            not does_key_exist_in_table("rdns", "ip", str(ip)) and
+            not does_key_exist_in_table("historic_rdns", "ip", str(ip))
+        ):
+            logger.debug("".join([ "Does not exist in 'rdns' nor 'historic_rdns': ", str(ip) ]))
+            # find zeek info
+            my_params_for_zeek_search["query"] = "".join([ "((pf_syslog_file:dns.log AND pf_syslog_js_answers:", str(ip)," AND _exists_:pf_syslog_js_query) OR (pf_syslog_file:ssl.log AND destination_ip:", str(ip)," AND _exists_:pf_syslog_js_server_name))" ])
+            # my_params_for_zeek_search["query"] = "".join([ "((pf_syslog_file:ssl.log AND destination_ip:", str(ip)," AND _exists_:pf_syslog_js_server_name))" ])
+            api = py_graylog_api(s_graylog_server, "/api/search/aggregate", s_token)
+            response = api.send("get", **my_params_for_zeek_search)
+            # logger.debug(json.dumps(response.json(), indent=4))
+            formatted_response = api.formatters(response, "jsonpath", "datarows[*]")
+            formatted_response = api.formatters(formatted_response, "first_non_empty_from_multi_column_list", "")
+            if formatted_response:
+                b_found_result = True
+            
+            if b_found_result == True:
+                logger.info("".join(["Found: ", str(ip), " = ", formatted_response, ". We can cache this!"]))
+                dict_to_cache = {
+                    "ip": str(ip),
+                    "name": str(formatted_response),
+                    "ttl": int(args.cache_ttl),
+                    "lookup_source": "zeek",
+                    "date_created": getUnixTimeUtc()
+                }
+                save_lookup_in_cache("rdns", dict_to_cache)
+            else:
+                logger.warning("".join(["Nothing found for: ", str(ip)]))
+        else:
+            logger.info("".join([ "Already exists in 'rdns' or 'historic_rdns': ", str(ip) ]))
+
+    exit(0)
+
 if configFromArg['exit']:
     # rs = doLookups("lookup=" + configFromArg['lookup'] + "&key=" + configFromArg['key'])
     # print(rs)
     a=1
     b_exists = does_key_exist_in_table("rdns", "ip", "192.168.0.1")
     logger.debug(b_exists)
-    
-
 else:
     if __name__ == "__main__":
         init_db_success = init_cache_db(mariadb_host, mariadb_port, mariadb_user, mariadb_pass)
