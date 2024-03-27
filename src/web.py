@@ -47,6 +47,7 @@ parser.add_argument("--vt-api-key", default="")
 parser.add_argument("--healthcheck-file", help="file to use for healthcheck, 1=up, 0=down", default="healthcheck.txt")
 parser.add_argument("--cache-ttl", help="Number of seconds to cache record for. After this time record is deleted. Use 0 to disable TTL.", default=86400, type=int)
 parser.add_argument("--find-dns-for-ip-without-ptr", action=argparse.BooleanOptionalAction, default=False)
+parser.add_argument("--find-dns-for-ip-without-ptr-count-only", action=argparse.BooleanOptionalAction, default=False)
 
 args = parser.parse_args()
 configFromArg = vars(args)
@@ -1237,6 +1238,9 @@ if args.find_dns_for_ip_without_ptr == True:
     }
     l_ips = py_graylog_api.views_search(s_graylog_server, s_token, my_params)
     logger.info("".join([ "Found ", str(len(l_ips)), " ips without rdns/ptr info." ]))
+
+    if args.find_dns_for_ip_without_ptr_count_only == True:
+        logger.info("--find-dns-for-ip-without-ptr-count-only used, exiting after showing count.")
 
     my_params_for_zeek_search = {
         "sreams": "63068dc98a735a37e8d535f9",
