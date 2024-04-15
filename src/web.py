@@ -251,6 +251,27 @@ def get_table_create_sql(tablename: str):
                     'PRIMARY KEY (uid)' + '\n' +
                 ');')
     
+    elif tablename == "cache_key_value":
+
+        # ip            TEXT
+        # name          TEXT
+        # has_lookup    INT (0/1)
+        # ttl           INT
+        # date_created  INT
+
+        sql = ('CREATE TABLE graylog_lookups.cache_key_value (' + '\n' + 
+                'uid INT auto_increment NOT NULL,' + '\n' + 
+                'lookup_key varchar(255) NOT NULL,' + '\n' + 
+                'lookup_val varchar(255) NULL,' + '\n' + 
+                'date_created VARCHAR(15) NOT NULL,' + '\n' + 
+                'CONSTRAINT cache_key_value_pk PRIMARY KEY (uid),' + '\n' + 
+                'CONSTRAINT cache_key_value_unique UNIQUE KEY (`lookup_key`)' + '\n' + 
+            ')' + '\n' + 
+            'ENGINE=InnoDB' + '\n' + 
+            'DEFAULT CHARSET=utf8mb4' + '\n' + 
+            'COLLATE=utf8mb4_general_ci;' + '\n' + 
+            ';')
+    
     return sql
 
 def does_table_exist(cur, tablename: str):
@@ -370,6 +391,7 @@ def init_cache_db(hostname: str, port: int, username: str, password: str):
     l_cache_tables.append("rdns")
     l_cache_tables.append("migrations")
     l_cache_tables.append("historic_rdns")
+    l_cache_tables.append("cache_key_value")
 
     l_existing_tables = []
 
@@ -546,6 +568,7 @@ def cache_result_format(lookup_table: str, row):
     dict_field_pos = {}
     dict_field_pos["rdns"] = ["uid", "ip", "name", "has_lookup", "lookup_source", "ttl", "date_created"]
     dict_field_pos["historic_rdns"] = ["uid", "ip", "name", "lookup_source", "ttl", "date_created_rdns", "date_created"]
+    dict_field_pos["cache_key_value"] = ["uid", "lookup_key", "lookup_val", "date_created"]
     
     lookup_list_field_pos = list_to_numbers(dict_field_pos[lookup_table])
 
@@ -569,15 +592,32 @@ def cache_result_format(lookup_table: str, row):
                 "date_created": row[lookup_list_field_pos["date_created_rdns"]],
                 "lookup_source": row[lookup_list_field_pos["lookup_source"]]
             }
+    elif lookup_table == "cache_key_value":
+        if row:
+            return {
+                "lookup_key": row[lookup_list_field_pos["lookup_key"]],
+                "lookup_val": row[lookup_list_field_pos["lookup_val"]],
+                "date_created": row[lookup_list_field_pos["date_created"]]
+            }
     
     return {}
 
-def get_lookup_from_cache(lookup_table: str, lookup_key: str):
+def get_lookup_from_cache(lookup_table: str, lookup_key: str, key_column: str):
     if not args.cache_mariadb == True:
         return {}
+    
 
     b_error = True
-    str_sql = "SELECT * FROM " + str(lookup_table) + " WHERE ip = '" + str(lookup_key) + "' ORDER BY date_created DESC LIMIT 1"
+    # str_sql = "SELECT * FROM " + str(lookup_table) + " WHERE ip = '" + str(lookup_key) + "' ORDER BY date_created DESC LIMIT 1"
+    str_sql = "".join([ 
+            "SELECT * FROM ",
+            str(lookup_table),
+            " WHERE ", str(key_column), " = ",
+            " '", str(lookup_key), "' ",
+            " ORDER BY date_created ",
+            " DESC LIMIT 1 "
+        ])
+
     logger.debug(str_sql)
     rs_cur = mariadb_get_cur(mariadb_host, mariadb_port, mariadb_user, mariadb_pass, MARIADB_FAIL_NOTFATAL)
 
@@ -665,7 +705,7 @@ def lookupRDns(argQuery):
     b_historic_cache_record = False
     cache_record = {}
     if args.cache_mariadb == True:
-        cache_record = get_lookup_from_cache("rdns", str(argQuery))
+        cache_record = get_lookup_from_cache("rdns", str(argQuery), 'ip')
 
     # logging.debug("cache_record: " + str(cache_record))
 
@@ -744,7 +784,7 @@ def lookupRDns(argQuery):
         else:
             has_lookup = 0
             # if no live result, check historical long term table
-            historic_cache_record = get_lookup_from_cache("historic_rdns", str(argQuery))
+            historic_cache_record = get_lookup_from_cache("historic_rdns", str(argQuery), "ip")
             logger.debug("".join([ "historic_cache_record = ", str(historic_cache_record) ]))
             b_continue = True
 
@@ -784,7 +824,7 @@ def lookupRDns(argQuery):
                     b_is_ip = validate_ip_addr_ver(str(argQuery), 4)
                     if b_is_ip == True:
                         delete_lookup_in_cache("rdns", str(argQuery))
-                        save_lookup_in_cache("rdns", dict_to_cache)
+                        save_lookup_in_cache("rdns", dict_to_cache, "", "", "", "")
 
         return {
             "value": result,
@@ -989,11 +1029,40 @@ def cache_dns_answer(arg_query):
                 }
                 logging.debug(dict_to_cache)
                 delete_lookup_in_cache("rdns", str(one_answer))
-                save_lookup_in_cache("rdns", dict_to_cache)
+                save_lookup_in_cache("rdns", dict_to_cache, "", "", "", "")
 
                 logging.info("[[cache_dns_answer]] caching query and answer from zeek DNS logging. " + str(one_answer) + "=" + str(s_query))
 
     return {"value":""}
+
+def cache_key_value(arg_query):
+    if not "key" in arg_query:
+        logging.error("[[cache_key_value]] missing key 'key' in URI arguments")
+        return {"value":""}
+    if not "value" in arg_query:
+        logging.error("[[cache_key_value]] missing key 'value' in URI arguments")
+        return {"value":""}
+
+    dict_to_cache = {
+        "lookup_key": "".join([ str(urllib.parse.unquote(arg_query['key'])) ]),
+        "lookup_val": str(urllib.parse.unquote(arg_query['value'])),
+        "date_created": getUnixTimeUtc()
+    }
+    logger.debug(json.dumps(dict_to_cache, indent=4))
+    save_lookup_in_cache("cache_key_value", dict_to_cache, "lookup_key", "lookup_key", "lookup_val", "lookup_val")
+
+    return {"value":""}
+
+def get_key_value_from_cache(arg_query):
+    if not "key" in arg_query:
+        logging.error("[[cache_key_value]] missing key 'key' in URI arguments")
+        return {"value":""}
+    
+    cache_record = get_lookup_from_cache("cache_key_value", str(urllib.parse.unquote(arg_query['key'])), "lookup_key")
+    if cache_record and 'lookup_val' in cache_record:
+        return {"value": cache_record['lookup_val']}
+
+    return {"value": ""}
 
 def parseArgs(argQuery):
     dictArgs = {}
@@ -1024,6 +1093,10 @@ def doLookups(argQuery):
         return virus_total_hash(oArgs['key'])
     elif sLookup == "cache_dns_answer":
         return cache_dns_answer(oArgs['key'])
+    elif sLookup == "cache_key_value":
+        return cache_key_value(oArgs)
+    elif sLookup == "get_key_value":
+        return get_key_value_from_cache(oArgs)
 
 def get_text_file_contents(s_filename):
     if not exists(s_filename):
@@ -1277,7 +1350,7 @@ if args.find_dns_for_ip_without_ptr == True:
                     "lookup_source": "zeek",
                     "date_created": getUnixTimeUtc()
                 }
-                save_lookup_in_cache("rdns", dict_to_cache)
+                save_lookup_in_cache("rdns", dict_to_cache, "", "")
             else:
                 logger.warning("".join(["Nothing found for: ", str(ip)]))
         else:
