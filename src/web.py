@@ -52,6 +52,12 @@ parser.add_argument("--find-dns-for-ip-without-ptr-count-only", action=argparse.
 args = parser.parse_args()
 configFromArg = vars(args)
 
+log_args = {}
+for arg in configFromArg:
+    log_args[arg] = configFromArg[arg]
+del log_args["vt_api_key"]
+del log_args["sql_pass"]
+
 logger = logging.getLogger('PythonGraylogLookupsWeb')
 logger.setLevel(logging.DEBUG)
 
@@ -1414,6 +1420,7 @@ if configFromArg['exit']:
     logger.debug(b_exists)
 else:
     if __name__ == "__main__":
+        logger.info("".join([ "Starting web.py with arguments: ", str(json.dumps(log_args, indent=4)) ]))
         init_db_success = init_cache_db(mariadb_host, mariadb_port, mariadb_user, mariadb_pass)
         if init_db_success == False:
             logging.error("ERROR! Failed to initialize graylog_lookups MariaDB database.")
