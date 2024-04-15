@@ -47,6 +47,11 @@ parser.add_argument("--cache-ttl", help="Number of seconds to cache record for. 
 parser.add_argument("--find-dns-for-ip-without-ptr", action=argparse.BooleanOptionalAction, default=False)
 parser.add_argument("--find-dns-for-ip-without-ptr-count-only", action=argparse.BooleanOptionalAction, default=False)
 
+parser.add_argument("--sql-host", help="Hostname to connect to for SQL backend (MariaDB)", default="127.0.0.1", type=str)
+parser.add_argument("--sql-port", help="Port to connect to for SQL backend (MariaDB)", default=3306, type=int)
+parser.add_argument("--sql-user", help="Username used to connect to for SQL backend (MariaDB)", default="root", type=str)
+parser.add_argument("--sql-pass", help="Password used to connect to for SQL backend (MariaDB)", default="", type=str)
+
 args = parser.parse_args()
 configFromArg = vars(args)
 
@@ -62,14 +67,13 @@ logger.setLevel(logging.DEBUG)
 hostName = str(configFromArg['hostname'])
 serverPort = int(configFromArg['port'])
 logFile = str(configFromArg['log'])
-sDbFileName = args.db
 
 healthcheck_file = args.healthcheck_file
 
-mariadb_host = "127.0.0.1"
-mariadb_port = 3306
-mariadb_user = "root"
-mariadb_pass = ""
+mariadb_host = args.sql_host
+mariadb_port = args.sql_port
+mariadb_user = args.sql_user
+mariadb_pass = args.sql_pass
 MARIADB_FAIL_FATAL = True
 MARIADB_FAIL_NOTFATAL = False
 
