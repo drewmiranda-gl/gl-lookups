@@ -480,12 +480,12 @@ def does_key_exist_in_table(lookup_table: str, key_column: str, key_to_find: str
         return True
     return False
 
-def save_lookup_in_cache(lookup_table: str, dict_to_cache: dict):
+def save_lookup_in_cache(lookup_table: str, dict_to_cache: dict, key_column: str, dict_key: str, val_column: str, dict_val: str):
     if args.cache_mariadb == False:
         return False
 
     b_error = True
-    str_sql = convert_dict_to_sql_insert(lookup_table, dict_to_cache)
+    
     rs_cur = mariadb_get_cur(mariadb_host, mariadb_port, mariadb_user, mariadb_pass, MARIADB_FAIL_NOTFATAL)
     if rs_cur:
         if "cursor" in rs_cur and "conn" in rs_cur:
@@ -495,9 +495,57 @@ def save_lookup_in_cache(lookup_table: str, dict_to_cache: dict):
 
     if b_error == True:
         return False
+    
+    s_insert_or_update = "INSERT"
+
+    if (
+            key_column 
+            and len(key_column) > 0
+            and dict_key
+            and len(dict_key) > 0
+            and dict_key in dict_to_cache
+            and val_column 
+            and len(val_column) > 0
+            and dict_val
+            and len(dict_val) > 0
+        ):
+        # check for existence first
+        b_exists = does_key_exist_in_table(lookup_table, key_column, dict_to_cache[dict_key])
+        if b_exists == True:
+            s_insert_or_update = "UPDATE"
+
+
+    # Exist, UPDATE
+    if s_insert_or_update == "UPDATE":
+        upd_date_created_sql = ""
+        if "date_created" in dict_to_cache:
+            upd_date_created_sql = "".join([","
+                "date_created = ",
+                    str(dict_to_cache["date_created"])
+                ])
+
+        str_sql = "".join([
+                "UPDATE ",
+                    str(lookup_table),
+                " SET ",
+                    str(val_column),
+                        " = ",
+                           "'", str(dict_to_cache[dict_val]),"'",
+                    upd_date_created_sql,
+                " WHERE ",
+                    str(key_column),
+                        " = ",
+                             "'", str(dict_to_cache[dict_key]),"'"
+            ])
+        
+        logger.debug(str_sql)
+
+    elif s_insert_or_update == "INSERT":
+        # Does not exist, INSERT
+        str_sql = convert_dict_to_sql_insert(lookup_table, dict_to_cache)
 
     try:
-        # print(str_sql)
+        logger.debug("".join([ "[[save_lookup_in_cache]] ", str(str_sql) ]))
         cur.execute(str_sql)
         # print(f"{cur.rowcount} details inserted")
         conn.commit()
