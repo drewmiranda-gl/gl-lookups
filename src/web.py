@@ -545,8 +545,6 @@ def save_lookup_in_cache(lookup_table: str, dict_to_cache: dict, key_column: str
                         " = ",
                              "'", str(dict_to_cache[dict_key]),"'"
             ])
-        
-        logger.debug(str_sql)
 
     elif s_insert_or_update == "INSERT":
         # Does not exist, INSERT
