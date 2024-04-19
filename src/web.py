@@ -572,7 +572,7 @@ def delete_lookup_in_cache(lookup_table: str, lookup_key: str):
     
     # delete should MOVE record to a long term table
     # IF a new entry cannot be found after cache is cleared, repopulate using default TTL
-    b_historical_record_exists = does_key_exist_in_table("rdns", "ip", str(lookup_key))
+    b_historical_record_exists = does_key_exist_in_table("historic_rdns", "ip", str(lookup_key))
     if not b_historical_record_exists:
         # insert
         str_sql = "".join(["INSERT INTO historic_rdns (ip, name, lookup_source, date_created_rdns, date_created) SELECT ip,name,lookup_source ,date_created,UTC_TIMESTAMP() FROM ", str(lookup_table)," WHERE ip = '", str(lookup_key),"'"])
