@@ -772,9 +772,28 @@ def lookupRDns(argQuery):
     if args.cache_mariadb == True:
         cache_record = get_lookup_from_cache("rdns", str(argQuery), 'ip')
 
-    # logging.debug("cache_record: " + str(cache_record))
+    b_return_empty_too_many_failures = False
 
-    if cache_record and 'has_lookup' in cache_record:
+    if (
+        cache_record
+        and 'has_lookup' in cache_record
+        and int(cache_record['has_lookup']) == 0
+        and "failure_count" in cache_record
+        and cache_record["failure_count"] > 2
+        ):
+        d_tmp_log = {
+            "msg": "Lookup Key has failed too many times",
+            "failure_count": cache_record["failure_count"],
+            "function": "lookupRDns",
+            "key": cache_record["ip"],
+            "ttl": str(cache_record["ttl"])
+        }
+        logger.warning("".join([ "[[lookupRDns]] Lookup Key '", cache_record["ip"],"' has failed too many times, will not try again until TTL of '", cache_record["ttl"], "' expires. ", str(json.dumps(d_tmp_log)) ]))
+        b_return_empty_too_many_failures = True
+
+    if cache_record and 'has_lookup' in cache_record and int(cache_record['has_lookup']) == 1:
+        # check if we need to put this query in timeout for too many timeout failures
+
         str_cached_result_returned = {
             "value": cache_record['name'],
             "lookup": argQuery,
@@ -788,7 +807,12 @@ def lookupRDns(argQuery):
             str_cached_result_returned["age_days"] = str(getDiffInDays(int(cache_record['date_created']), "utime"))
         if "lookup_source" in cache_record:
             str_cached_result_returned["lookup_source"] = cache_record["lookup_source"]
+    else:
+        logging.debug("NO Cache record found for: " + str(argQuery))
 
+    if cache_record:
+        # =========================================================================
+        # Start
         # check for TTL expiration
         unix_time_now_utc = getUnixTimeUtc()
         if 'ttl' in cache_record and 'date_created' in cache_record:
@@ -800,19 +824,29 @@ def lookupRDns(argQuery):
                 logger.info("".join([ "Cache TTL of ", str(ttl)," Expired, deleting cached record: rdns,", str(argQuery) ]))
 
                 delete_lookup_in_cache("rdns", str(argQuery))
+                cache_record["failure_count"] = 0
+                b_return_empty_too_many_failures = False
 
             else:
                 if int(ttl) == 0:
                     logging.debug("".join([ "TTL=0, not expiring: ", str(argQuery) ]))
-                return str_cached_result_returned
+                
+                if 'has_lookup' in cache_record and int(cache_record['has_lookup']) == 1:
+                    return str_cached_result_returned
         else:
             if 'has_lookup' in cache_record and int(cache_record['has_lookup']) == 0:
                 logging.info("Cache record has no hostname saved: " + str(argQuery))
                 return {"value": ""}
             else:
                 return str_cached_result_returned
-    else:
-        logging.debug("NO Cache record found for: " + str(argQuery))
+    # End TTL Work
+    # =========================================================================
+
+    if b_return_empty_too_many_failures == True:
+        return {
+            "value": "",
+            "meta": "query ignored, no result returned."
+        }
 
     lIgnoreThese = ["239.255.255.250", "255.255.255.255"]
 
@@ -878,6 +912,24 @@ def lookupRDns(argQuery):
             # if configFromArg['verbose'] == True:
             #     print("exeption is in result")
             # add to db for future exclusion
+            dict_to_cache = {
+                "ip": str(argQuery),
+                "name": str(""),
+                "ttl": int(3600),
+                "lookup_source": "dns",
+                "date_created": getUnixTimeUtc(),
+                "has_lookup": 0
+            }
+            current_failure_count = 0
+            if "failure_count" in cache_record:
+                current_failure_count = cache_record["failure_count"]
+                
+            new_failure_count = current_failure_count + 1
+            dict_to_cache["failure_count"] = new_failure_count
+            
+            # save_lookup_in_cache("cache_key_value", dict_to_cache, "lookup_key", "lookup_key", "lookup_val", "lookup_val")
+            save_lookup_in_cache("rdns", dict_to_cache, "ip", "ip", "name", "name")
+            
             return result
         else:
             # prevent caching empty lookups
