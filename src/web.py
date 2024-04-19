@@ -353,6 +353,9 @@ def run_init_db_mig(conn, cur, migration_name: str):
     elif migration_name == "rdns_make_ip_name_uniq": 
         sql = 'CREATE UNIQUE INDEX rdns_ip_name_uniq USING BTREE ON graylog_lookups.rdns (ip,name);'
     
+    elif migration_name == "rdns_add_failure_count": 
+        sql = 'ALTER TABLE graylog_lookups.rdns ADD failure_count TINYINT(1) DEFAULT 0 NULL;'
+    
     else:
         return False
     
@@ -427,6 +430,7 @@ def init_cache_db(hostname: str, port: int, username: str, password: str):
     l_migrations.append("rdns_convert_name_from_text_to_varchar")
     l_migrations.append("remove_duplicates_from_rdns")
     l_migrations.append("rdns_make_ip_name_uniq")
+    l_migrations.append("rdns_add_failure_count")
 
     # l_migrations.append("permanent_rdns_index_create_ip")
 
@@ -531,6 +535,11 @@ def save_lookup_in_cache(lookup_table: str, dict_to_cache: dict, key_column: str
                 "date_created = ",
                     str(dict_to_cache["date_created"])
                 ])
+        if "failure_count" in dict_to_cache:
+            upd_date_created_sql = "".join([","
+                "failure_count = ",
+                    str(dict_to_cache["failure_count"])
+                ])
 
         str_sql = "".join([
                 "UPDATE ",
@@ -620,7 +629,7 @@ def list_to_numbers(input_list: list):
 
 def cache_result_format(lookup_table: str, row):
     dict_field_pos = {}
-    dict_field_pos["rdns"] = ["uid", "ip", "name", "has_lookup", "lookup_source", "ttl", "date_created"]
+    dict_field_pos["rdns"] = ["uid", "ip", "name", "has_lookup", "lookup_source", "ttl", "date_created", "failure_count"]
     dict_field_pos["historic_rdns"] = ["uid", "ip", "name", "lookup_source", "ttl", "date_created_rdns", "date_created"]
     dict_field_pos["cache_key_value"] = ["uid", "lookup_key", "lookup_val", "date_created"]
     
@@ -634,7 +643,8 @@ def cache_result_format(lookup_table: str, row):
                 "has_lookup": row[lookup_list_field_pos["has_lookup"]],
                 "ttl": row[lookup_list_field_pos["ttl"]],
                 "date_created": row[lookup_list_field_pos["date_created"]],
-                "lookup_source": row[lookup_list_field_pos["lookup_source"]]
+                "lookup_source": row[lookup_list_field_pos["lookup_source"]],
+                "failure_count": row[lookup_list_field_pos["failure_count"]]
             }
     elif lookup_table == "historic_rdns":
         if row:
