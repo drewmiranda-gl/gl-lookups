@@ -609,7 +609,7 @@ def delete_lookup_in_cache(lookup_table: str, lookup_key: str):
         return False
 
     try:
-        # print(str_sql)
+        logger.debug("".join(["[[delete_lookup_in_cache]] ", str(str_sql)]))
         cur.execute(str_sql)
         # print(f"{cur.rowcount} details inserted")
         conn.commit()
@@ -710,6 +710,7 @@ def get_ipv4_by_hostname(hostname):
     return rs
 
 def get_domain_name(ip_address):
+    logger.debug("".join(["[[get_domain_name]] '", ip_address,"'"]))
     socket.setdefaulttimeout(5)
 
     try:
