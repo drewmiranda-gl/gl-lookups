@@ -1,11 +1,13 @@
 # python
 
-sudo apt-get -y install mariadb-client libmariadb3 libmariadb-dev
+sudo apt update
+sudo apt-get -y install mariadb-client libmariadb3 libmariadb-dev python3-pip
+sudo python3 -m pip install pipreqs
 sudo python3 -m pip install -r requirements.txt
 
 # haproxy
 sudo apt install -y haproxy
-cp -f haproxy/haproxy.cfg /etc/haproxy/
+sudo cp -f haproxy/haproxy.cfg /etc/haproxy/
 
 # create service user
 # gl_lookup_service
@@ -17,6 +19,14 @@ sudo mkdir -p /opt/graylog/lookup-service
 # copy files
 sudo cp -f web.py /opt/graylog/lookup-service
 sudo cp -f dns_ip_search.py /opt/graylog/lookup-service
+
+echo "[DEFAULT]
+https = false
+host = host.domain.tld
+port = 9000
+user = tokenvalue
+password = token" > config.ini
+
 sudo cp -f config.ini /opt/graylog/lookup-service
 sudo mv -f /opt/graylog/lookup-service/config.ini /opt/graylog/lookup-service/auth.ini
 
@@ -26,14 +36,14 @@ sudo chmod +x /opt/graylog/lookup-service/service-wrapper.sh
 sudo cp -f set-health-helper.sh /opt/graylog/lookup-service
 sudo chmod +x /opt/graylog/lookup-service/set-health-helper.sh
 
-sudo cp -f update.sh /opt/graylog/lookup-service
-sudo chmod +x /opt/graylog/lookup-service/update.sh
+# sudo cp -f update.sh /opt/graylog/lookup-service
+# sudo chmod +x /opt/graylog/lookup-service/update.sh
 
 # set owner
-touch /opt/graylog/lookup-service/web1.log
-touch /opt/graylog/lookup-service/web2.log
-touch /opt/graylog/lookup-service/web3.log
-touch /opt/graylog/lookup-service/web4.log
+sudo touch /opt/graylog/lookup-service/web1.log
+sudo touch /opt/graylog/lookup-service/web2.log
+sudo touch /opt/graylog/lookup-service/web3.log
+sudo touch /opt/graylog/lookup-service/web4.log
 
 echo 0 | sudo tee /opt/graylog/lookup-service/health1.txt
 echo 0 | sudo tee /opt/graylog/lookup-service/health2.txt
