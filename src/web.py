@@ -1170,6 +1170,24 @@ def cache_key_value(arg_query):
 
     return {"value":""}
 
+def cleanup_stale_key_value_from_cache(arg_query):
+    if not "prefix" in arg_query:
+        logging.error("[[cleanup_stale_key_value_from_cache]] missing key 'prefix' in URI arguments")
+        return {"value":""}
+    if not "older_than_unixtime" in arg_query:
+        logging.error("[[cleanup_stale_key_value_from_cache]] missing key 'older_than_unixtime' in URI arguments")
+        return {"value":""}
+
+    mariadb_exec_sql_safe(
+        "DELETE FROM cache_key_value WHERE lookup_key LIKE %(key_to_find)s AND date_created < %(older_than_unixtime)s",
+        {
+            'key_to_find': "".join([ str(arg_query["prefix"]), "%" ]),
+            'older_than_unixtime': int(arg_query["older_than_unixtime"])
+        }
+    )
+
+    return {"value":""}
+
 def get_key_value_from_cache(arg_query):
     if not "key" in arg_query:
         logging.error("[[cache_key_value]] missing key 'key' in URI arguments")
@@ -1214,6 +1232,8 @@ def doLookups(argQuery):
         return cache_key_value(oArgs)
     elif sLookup == "get_key_value":
         return get_key_value_from_cache(oArgs)
+    elif sLookup == "cleanup_stale_key_value":
+        return cleanup_stale_key_value_from_cache(oArgs)
 
 def get_text_file_contents(s_filename):
     if not exists(s_filename):
