@@ -16,7 +16,7 @@ for vm_id in ${vm_ids}; do
 done
 
 # get LXC ids and names
-lxc_ids=$(pct list | awk '{print $1","$3}')
+lxc_ids=$(/usr/sbin/pct list | awk '{print $1","$3}')
 i=0
 for line in ${lxc_ids}; do
     if ((i > 0)); then
