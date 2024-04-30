@@ -1,5 +1,15 @@
 # Graylog Lookups
 
+## Install
+
+* Prerequisites
+    * App Packages `libmariadb3` and `libmariadb-dev`
+        * `sudo apt install -y libmariadb3 libmariadb-dev`
+    * PIP requirements
+        * `python3 -m pip install -r requirements.txt`
+            * Note that pip package [mariadb](https://pypi.org/project/mariadb/) [requires libmariadb3 and libmariadb-dev](https://mariadb.com/docs/server/connect/programming-languages/c/install/)
+
+
 ## About
 
 ### What is this?
