@@ -875,79 +875,79 @@ def lookupRDns(argQuery):
             "value": "",
             "meta": "query ignored, no result returned."
         }
+
+    result = get_domain_name(argQuery)
+
+    if len(result) > 0:
+        has_lookup = 1
     else:
-        result = get_domain_name(argQuery)
+        has_lookup = 0
+        # if no live result, check historical long term table
+        historic_cache_record = get_lookup_from_cache("historic_rdns", str(argQuery), "ip")
+        logger.debug("".join([ "historic_cache_record = ", str(historic_cache_record) ]))
+        b_continue = True
 
-        if len(result) > 0:
+        if not len(historic_cache_record):
+            logger.debug("Pass len(historic_cache_record)")
+            b_continue = False
+        if not "name" in historic_cache_record:
+            b_continue = False
+        if b_continue == True:
+            result = historic_cache_record["name"]
             has_lookup = 1
-        else:
-            has_lookup = 0
-            # if no live result, check historical long term table
-            historic_cache_record = get_lookup_from_cache("historic_rdns", str(argQuery), "ip")
-            logger.debug("".join([ "historic_cache_record = ", str(historic_cache_record) ]))
-            b_continue = True
+            b_historic_cache_record = True
+    
 
-            if not len(historic_cache_record):
-                logger.debug("Pass len(historic_cache_record)")
-                b_continue = False
-            if not "name" in historic_cache_record:
-                b_continue = False
-            if b_continue == True:
-                result = historic_cache_record["name"]
-                has_lookup = 1
-                b_historic_cache_record = True
-        
+    dict_to_cache = {
+        "ip": str(argQuery),
+        "name": str(result),
+        "ttl": int(args.cache_ttl),
+        "lookup_source": "dns",
+        "date_created": getUnixTimeUtc()
+    }
 
+    dict_to_cache["has_lookup"] = has_lookup
+
+    if "exception" in result:
+        # if configFromArg['verbose'] == True:
+        #     print("exeption is in result")
+        # add to db for future exclusion
         dict_to_cache = {
             "ip": str(argQuery),
-            "name": str(result),
-            "ttl": int(args.cache_ttl),
+            "name": str(""),
+            "ttl": int(3600),
             "lookup_source": "dns",
-            "date_created": getUnixTimeUtc()
+            "date_created": getUnixTimeUtc(),
+            "has_lookup": 0
         }
-
-        dict_to_cache["has_lookup"] = has_lookup
-
-        if "exception" in result:
-            # if configFromArg['verbose'] == True:
-            #     print("exeption is in result")
-            # add to db for future exclusion
-            dict_to_cache = {
-                "ip": str(argQuery),
-                "name": str(""),
-                "ttl": int(3600),
-                "lookup_source": "dns",
-                "date_created": getUnixTimeUtc(),
-                "has_lookup": 0
-            }
-            current_failure_count = 0
-            if "failure_count" in cache_record:
-                current_failure_count = cache_record["failure_count"]
-                
-            new_failure_count = current_failure_count + 1
-            dict_to_cache["failure_count"] = new_failure_count
+        current_failure_count = 0
+        if "failure_count" in cache_record:
+            current_failure_count = cache_record["failure_count"]
             
-            # save_lookup_in_cache("cache_key_value", dict_to_cache, "lookup_key", "lookup_key", "lookup_val", "lookup_val")
-            save_lookup_in_cache("rdns", dict_to_cache, "ip", "ip", "name", "name")
-            
-            return result
-        else:
-            # prevent caching empty lookups
-            if has_lookup == 1:
-                if b_historic_cache_record == True:
-                    logger.info("".join([ "[[lookupRDns]] reviving historic rdns record.", " ", json.dumps(dict_to_cache) ]))
+        new_failure_count = current_failure_count + 1
+        dict_to_cache["failure_count"] = new_failure_count
+        
+        # save_lookup_in_cache("cache_key_value", dict_to_cache, "lookup_key", "lookup_key", "lookup_val", "lookup_val")
+        save_lookup_in_cache("rdns", dict_to_cache, "ip", "ip", "name", "name")
+        
+        return result
+    else:
+        # prevent caching empty lookups
+        if has_lookup == 1:
+            if b_historic_cache_record == True:
+                logger.info("".join([ "[[lookupRDns]] reviving historic rdns record.", " ", json.dumps(dict_to_cache) ]))
 
-                if args.debug_save_in_mariadb_cache == True:
-                    b_is_ip = validate_ip_addr_ver(str(argQuery), 4)
-                    if b_is_ip == True:
-                        delete_lookup_in_cache("rdns", str(argQuery))
-                        save_lookup_in_cache("rdns", dict_to_cache, "", "", "", "")
+            if args.debug_save_in_mariadb_cache == True:
+                b_is_ip = validate_ip_addr_ver(str(argQuery), 4)
+                if b_is_ip == True:
+                    delete_lookup_in_cache("rdns", str(argQuery))
+                    save_lookup_in_cache("rdns", dict_to_cache, "", "", "", "")
 
-        return {
-            "value": result,
-            "meta": "returned from rDNS query",
-            "cached": 0
-        }
+    return {
+        "value": result,
+        "meta": "returned from rDNS query",
+        "cached": 0
+    }
 
 def lookupDns(argQuery):
     result = get_ipv4_by_hostname(argQuery)
