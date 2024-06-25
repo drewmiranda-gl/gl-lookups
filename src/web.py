@@ -1107,6 +1107,8 @@ def convert_comma_string_to_list(comma_list: str):
     return new_list
 
 def cache_dns_answer(arg_query):
+    bAllowCachingAnswer = True
+
     o_js = {}
     try:
         str_url_decode = urllib.parse.unquote(arg_query)
@@ -1156,9 +1158,16 @@ def cache_dns_answer(arg_query):
                 }
                 logging.debug(dict_to_cache)
                 # delete_lookup_in_cache("rdns", str(one_answer))
-                save_lookup_in_cache("rdns", dict_to_cache, "ip", "ip", "name", "name")
 
-                logging.info("[[cache_dns_answer]] caching query and answer from zeek DNS logging. " + str(one_answer) + "=" + str(s_query))
+                lIgnoreThese = ["0.0.0.0", "127.0.0.1"]
+                if str(dict_to_cache["ip"]) in lIgnoreThese:
+                    bAllowCachingAnswer = False
+                
+                if bAllowCachingAnswer == True:
+                    save_lookup_in_cache("rdns", dict_to_cache, "ip", "ip", "name", "name")
+                    logging.info("[[cache_dns_answer]] caching query and answer from zeek DNS logging. " + str(one_answer) + "=" + str(s_query))
+                else:
+                    logging.info("[[cache_dns_answer]] DISALLOWED from caching query and answer from zeek DNS logging. " + str(one_answer) + "=" + str(s_query))
 
     return {"value":""}
 
