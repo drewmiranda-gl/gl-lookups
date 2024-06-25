@@ -851,6 +851,7 @@ def lookupRDns(argQuery):
     lIgnoreThese = ["239.255.255.250", "255.255.255.255"]
 
     bGiveResult = True
+    bGiveStaticResult = False
 
     if str(argQuery) in lIgnoreThese:
         bGiveResult = False
@@ -867,13 +868,22 @@ def lookupRDns(argQuery):
     elif ipaddress.ip_address(str(argQuery)) in ipaddress.ip_network('127.16.0.0/12'):
         bGiveResult = False
     elif ipaddress.ip_address(str(argQuery)) in ipaddress.ip_network('127.0.0.0/8'):
-        bGiveResult = True
+        bGiveStaticResult = True
         result = "localhost"
+    elif str(argQuery) == "0.0.0.0":
+        bGiveStaticResult = True
+        result = "zero_zero_zero_zero"
 
     if bGiveResult == False:
         return {
             "value": "",
             "meta": "query ignored, no result returned."
+        }
+        
+    if bGiveStaticResult == True:
+        return {
+            "value": str(result),
+            "meta": "static result"
         }
 
     result = get_domain_name(argQuery)
