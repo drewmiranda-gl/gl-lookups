@@ -950,8 +950,8 @@ def lookupRDns(argQuery):
             if args.debug_save_in_mariadb_cache == True:
                 b_is_ip = validate_ip_addr_ver(str(argQuery), 4)
                 if b_is_ip == True:
-                    delete_lookup_in_cache("rdns", str(argQuery))
-                    save_lookup_in_cache("rdns", dict_to_cache, "", "", "", "")
+                    # delete_lookup_in_cache("rdns", str(argQuery))
+                    save_lookup_in_cache("rdns", dict_to_cache, "ip", "ip", "name", "name")
 
     return {
         "value": result,
@@ -1155,8 +1155,8 @@ def cache_dns_answer(arg_query):
                     "date_created": getUnixTimeUtc()
                 }
                 logging.debug(dict_to_cache)
-                delete_lookup_in_cache("rdns", str(one_answer))
-                save_lookup_in_cache("rdns", dict_to_cache, "", "", "", "")
+                # delete_lookup_in_cache("rdns", str(one_answer))
+                save_lookup_in_cache("rdns", dict_to_cache, "ip", "ip", "name", "name")
 
                 logging.info("[[cache_dns_answer]] caching query and answer from zeek DNS logging. " + str(one_answer) + "=" + str(s_query))
 
