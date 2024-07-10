@@ -10,10 +10,17 @@ Group=gl_lookup_service
 WorkingDirectory=/opt/graylog/lookup-service
 Type=simple
 Restart=always
-ExecStart=/opt/graylog/lookup-service/service-wrapper.sh 8081 /opt/graylog/lookup-service/web1.log /opt/graylog/lookup-service/health1.txt
-ExecStartPre=/bin/sleep 60
+ExecStart=/opt/graylog/lookup-service/service-wrapper-host.sh 0.0.0.0 8083 /opt/graylog/lookup-service/web1.log /opt/graylog/lookup-service/health1.txt
+
+# this is a very lame workaround to ensure MariaDB is booted when service starts
+ExecStartPre=/bin/sleep 10
+
+# set service health to 1 (online)
 ExecStartPost=/opt/graylog/lookup-service/set-health-helper.sh /opt/graylog/lookup-service/health1.txt 1
+
+# set service health to 0 (offline)
 ExecStop=/opt/graylog/lookup-service/set-health-helper.sh /opt/graylog/lookup-service/health1.txt 0
+
 RestartSec=5s
 
 [Install]
