@@ -1169,7 +1169,7 @@ def cache_dns_answer(arg_query):
                 else:
                     logging.info("[[cache_dns_answer]] DISALLOWED from caching query and answer from zeek DNS logging. " + str(one_answer) + "=" + str(s_query))
 
-    return {"value":""}
+    return {"value":"."}
 
 def cache_key_value(arg_query):
     if not "key" in arg_query:
